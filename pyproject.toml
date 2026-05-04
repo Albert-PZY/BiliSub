@@ -1,0 +1,30 @@
+[project]
+name = "bili-ai-sub"
+version = "0.1.0"
+description = "Lightweight Bilibili QR login and AI subtitle fetcher"
+readme = "README.md"
+authors = [
+    { name = "albert", email = "1431686413@qq.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28.1",
+    "qrcode>=8.2",
+]
+
+[project.scripts]
+bili-ai-sub = "bili_ai_sub:main"
+biliaisub = "bili_ai_sub:main"
+
+[build-system]
+requires = ["uv_build>=0.10.11,<0.11.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
+
+[[tool.uv.index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
