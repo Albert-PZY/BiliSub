@@ -1,0 +1,17 @@
+:root {
+  color-scheme: light;
+  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background:
+    radial-gradient(circle at top right, rgba(0, 174, 236, 0.14), transparent 38%),
+    linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+  color: #10233f;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+main {
+  padding: 16px;
+}

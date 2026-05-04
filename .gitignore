@@ -6,3 +6,8 @@ data/latest-login-qr.svg
 data/selftest-*.json
 data/selftest-*.srt
 data/selftest-*.txt
+node_modules/
+extension/node_modules/
+extension/dist/
+extension/playwright-report/
+extension/test-results/
