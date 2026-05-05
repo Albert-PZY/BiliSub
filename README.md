@@ -137,3 +137,37 @@ curl "http://127.0.0.1:8933/subtitles?source=BV1darmBcE4A&language=zh-Hans&inclu
 ```powershell
 uv run pytest tests -q
 ```
+
+## 浏览器插件开发
+
+浏览器插件代码位于 `extension/`，使用 `pnpm + TypeScript + React + Vite` 构建，目标是同一份 `MV3` 包同时兼容 Chrome 和 Edge。
+
+安装依赖并构建：
+
+```powershell
+pnpm install
+pnpm --dir extension build
+```
+
+运行单测和 smoke 检查：
+
+```powershell
+pnpm --dir extension exec vitest run
+pnpm --dir extension exec playwright test
+```
+
+本地加载未打包发布前的扩展产物：
+
+1. 打开 Chrome 或 Edge 的扩展管理页。
+2. 启用“开发者模式”。
+3. 选择“加载已解压的扩展程序”。
+4. 指向 `extension/dist` 目录。
+
+当前扩展约束：
+
+- 仅在 `https://www.bilibili.com/video/*` 页面启用字幕工作台。
+- 摘要 provider 仅支持 `OpenAI` 与 `阿里云百炼`，并固定使用官方域名预设。
+- 摘要请求统一走 OpenAI 兼容的 `POST /chat/completions`。
+- 用户 API Key 仅保存到 `chrome.storage.local`。
+- 摘要固定输出简体中文；如果 LLM 不可用或连接测试未通过，摘要功能直接不可用。
+- 公开版扩展不依赖本地 Python 环境、`localhost` 或 `127.0.0.1` 辅助服务。
