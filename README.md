@@ -163,6 +163,17 @@ pnpm --dir extension exec playwright test
 3. 选择“加载已解压的扩展程序”。
 4. 指向 `extension/dist` 目录。
 
+生成商店图标和发布素材：
+
+```powershell
+pwsh .\extension\scripts\generate-store-assets.ps1
+```
+
+发布清单与隐私草案：
+
+- [docs/publishing/browser-store-release-checklist.md](/F:/BiliAISub/docs/publishing/browser-store-release-checklist.md)
+- [docs/publishing/privacy-policy.md](/F:/BiliAISub/docs/publishing/privacy-policy.md)
+
 当前扩展约束：
 
 - 仅在 `https://www.bilibili.com/video/*` 页面启用字幕工作台。

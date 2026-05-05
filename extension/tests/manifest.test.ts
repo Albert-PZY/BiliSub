@@ -16,5 +16,16 @@ describe("manifest", () => {
     ]);
     expect(manifest.host_permissions).not.toContain("<all_urls>");
     expect(manifest.host_permissions).not.toContain("http://127.0.0.1/*");
+    expect(manifest.icons).toEqual({
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png",
+    });
+    expect(manifest.action?.default_icon).toEqual({
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+    });
   });
 });
