@@ -1,6 +1,6 @@
 [project]
 name = "bili-ai-sub"
-version = "0.1.0"
+version = "0.2.0"
 description = "Lightweight Bilibili QR login and AI subtitle fetcher"
 readme = "README.md"
 authors = [
