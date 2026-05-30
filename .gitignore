@@ -8,13 +8,7 @@ htmlcov/
 .env
 .env.*
 !.env.example
-data/session.json
-data/latest-login-qr.svg
-data/selftest-*.json
-data/selftest-*.srt
-data/selftest-*.txt
 node_modules/
 .next/
 out/
 .vercel/
-NEXT_STEPS.md

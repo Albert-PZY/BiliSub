@@ -1,14 +1,16 @@
 # BiliAISub
 
-一个 Next.js 全栈 TS 版 B 站 AI 字幕获取工具。
+BiliAISub 是一个 Next.js 全栈 TypeScript 应用，用来扫码登录 B 站并获取官方 AI 字幕。
 
-它只做三件事：
+它只保留当前核心能力：
 
-- 扫码登录 B 站
+- B 站扫码登录
 - 通过 BV 号或 B 站视频链接获取官方 AI 字幕
-- 按语言切换编辑，并下载 TXT、SRT、JSON
+- 一次获取全部可用字幕语言，或只获取指定语言
+- 在页面右侧按语言标签切换编辑
+- 下载当前语言、当前视频全部语言或全部成功字幕的 TXT、SRT、JSON
 
-登录态保存在加密的 HttpOnly Cookie 里，前端 JS 读不到。部署到 Vercel 时必须设置 `BILI_SUB_SESSION_SECRET`。
+登录态保存在加密的 HttpOnly Cookie 里，前端 JS 读不到。生产环境必须设置 `BILI_SUB_SESSION_SECRET`。
 
 ## 本地启动
 
@@ -17,21 +19,23 @@ pnpm install
 pnpm dev
 ```
 
-默认地址：
+打开：
 
 ```text
 http://localhost:3000
 ```
 
+本地开发不配置 `BILI_SUB_SESSION_SECRET` 也能跑，生产环境不能省。
+
 ## 环境变量
 
-本地开发可不配，生产必须配：
+生产环境必填：
 
 ```text
 BILI_SUB_SESSION_SECRET=一串足够长的随机字符串
 ```
 
-生成示例：
+生成一串可用密钥：
 
 ```powershell
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -41,13 +45,18 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ```text
 app/
-  api/                    Next.js API Routes，负责登录和字幕请求
-  page.tsx                页面入口
-components/               登录、视频输入、字幕列表、编辑、下载组件
-lib/server/
-  bilibili.ts             B 站扫码登录、字幕获取、SRT 格式化
-  session.ts              加密 HttpOnly Cookie 会话
-lib/local-api.ts          前端请求 API 的类型和工具
+  api/
+    auth/status/route.ts        检查登录态
+    auth/login/start/route.ts   生成扫码登录二维码
+    auth/login/poll/route.ts    轮询扫码登录结果并写入加密 Cookie
+    auth/logout/route.ts        清除登录态
+    subtitles/route.ts          获取字幕
+  page.tsx                      页面入口
+components/                     页面组件
+lib/local-api.ts                前端 API 类型和请求工具
+lib/server/bilibili.ts          B 站接口、字幕解析、SRT 渲染
+lib/server/session.ts           加密 HttpOnly Cookie 会话
+vercel.json                     Vercel 部署配置
 ```
 
 ## 常用命令
@@ -58,9 +67,23 @@ pnpm build
 pnpm dev
 ```
 
-## 部署
+## 部署到 Vercel
 
-推荐部署到 Vercel。GitHub Pages 不能跑服务端接口，所以不再作为主部署方式。
+1. 登录 `https://vercel.com`。
+2. 点 `Add New...`，选 `Project`。
+3. 选择 GitHub 仓库 `Albert-PZY/BiliSub`。
+4. Framework 保持 `Next.js`。
+5. Root Directory 保持 `./`。
+6. Install Command 使用 `pnpm install --frozen-lockfile`。
+7. Build Command 使用 `pnpm build`。
+8. 添加环境变量 `BILI_SUB_SESSION_SECRET`。
+9. 点 `Deploy`。
+
+以后合并到 `main`，Vercel 会自动重新部署。
+
+## 注意
+
+GitHub Pages 不能跑服务端接口，所以这个项目不再用 GitHub Pages 作为主部署方式。完整功能需要部署到 Vercel 或其他支持 Next.js 服务端运行的平台。
 
 ## 提交与发布
 
