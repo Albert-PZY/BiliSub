@@ -6,10 +6,9 @@ import time
 from pathlib import Path
 from typing import Sequence
 
-from .api_service import ApiService
 from .bilibili import BilibiliClient, BilibiliError, render_qr_ascii, render_srt, save_qr_svg
-from .http_api import create_http_api_server
 from .store import SessionStore
+from .web import create_web_server
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -22,6 +21,13 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     store = SessionStore(args.session_file)
     try:
+        if args.command == "web":
+            return handle_web(
+                store,
+                host=args.host,
+                port=args.port,
+            )
+
         with BilibiliClient(store=store) as client:
             if args.command == "login":
                 return handle_login(client, store, timeout_seconds=args.timeout)
@@ -38,12 +44,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                     preferred_language=args.language,
                     output_format=args.format,
                     output_path=args.output,
-                )
-            if args.command == "serve":
-                return handle_serve(
-                    store,
-                    host=args.host,
-                    port=args.port,
                 )
     except BilibiliError as exc:
         print(f"错误: {exc}", file=sys.stderr)
@@ -95,9 +95,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="输出文件路径；不传则直接打印到标准输出。",
     )
 
-    serve_parser = subparsers.add_parser("serve", help="启动极简本地 HTTP API。")
-    serve_parser.add_argument("--host", default="127.0.0.1", help="监听地址，默认 127.0.0.1。")
-    serve_parser.add_argument("--port", type=int, default=8933, help="监听端口，默认 8933。")
+    web_parser = subparsers.add_parser("web", help="启动本地网页工具。")
+    web_parser.add_argument("--host", default="127.0.0.1", help="监听地址，默认 127.0.0.1。")
+    web_parser.add_argument("--port", type=int, default=8933, help="监听端口，默认 8933。")
     return parser
 
 
@@ -173,18 +173,15 @@ def handle_subtitles(
     return 0
 
 
-def handle_serve(store: SessionStore, *, host: str, port: int) -> int:
-    service = ApiService(store=store)
-    server = create_http_api_server(service, host=host, port=port)
+def handle_web(store: SessionStore, *, host: str, port: int) -> int:
+    server = create_web_server(store=store, host=host, port=port)
     actual_host, actual_port = server.server_address
-    print(f"HTTP API 已启动: http://{actual_host}:{actual_port}")
-    print(f"健康检查: http://{actual_host}:{actual_port}/health")
-    print(f"状态接口: http://{actual_host}:{actual_port}/status")
-    print("按 Ctrl+C 停止服务。")
+    print(f"本地页面已启动: http://{actual_host}:{actual_port}")
+    print("仅绑定本机地址，按 Ctrl+C 停止。")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("正在停止 HTTP API。")
+        print("正在停止本地页面。")
     finally:
         server.shutdown()
         server.server_close()

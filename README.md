@@ -1,29 +1,71 @@
 # BiliAISub
 
-一个独立、轻量的 Python 小工具，用来：
+一个极简、独立的 B 站 AI 字幕获取工具。
 
-- 扫码登录 B 站并把登录态持久化到本地
-- 通过 `BV` 号或 B 站视频链接获取 AI 字幕
-- 直接输出 `text` / `srt` / `raw-json`
+它只做三件事：
 
-项目默认把本地会话保存到 `data/session.json`，不做额外加密，方便你直接查看和迁移。
+- 扫码登录 B 站，并把登录态保存到本机
+- 通过 BV 号或 B 站视频链接获取官方 AI 字幕
+- 支持命令行导出，也支持本地网页批量提取和下载
+
+本地会话默认保存到 `data/session.json`。这个文件不做额外加密，适合个人本机使用，不要提交到仓库或发给他人。
 
 ## 安装
 
 ```powershell
-cd F:\BiliAISub
+cd "F:\in-house project\BiliAISub"
 uv sync
 ```
 
-## 命令
+## 本地网页工具
 
-### 1. 扫码登录
+启动：
 
 ```powershell
-uv run bili-ai-sub login
+uv run biliaisub web
 ```
 
-或：
+默认地址：
+
+```text
+http://127.0.0.1:8933
+```
+
+页面能力：
+
+- 生成 B 站扫码登录二维码
+- 查看和清除本机登录态
+- 粘贴多行 BV 号或 B 站视频链接
+- 批量获取全部可用 AI 字幕语言，或只获取指定语言
+- 在右侧按语言标签页切换编辑
+- 按当前语言、当前视频全部语言或全部成功字幕下载 TXT、SRT、JSON
+
+网页前端位于 `frontend/`，使用 Next.js 静态导出。Python 只负责本机页面服务、扫码登录、保存登录态和请求 B 站字幕。
+
+### GitHub Pages
+
+项目会通过 GitHub Actions 自动把 `frontend/` 静态页面部署到 GitHub Pages。Pages 页面只适合作为公开展示和静态入口；真实扫码登录、登录态读取和 B 站字幕请求必须在本机运行 `uv run biliaisub web` 后由本地 Python 服务提供。
+
+### 前端开发
+
+```powershell
+pnpm --dir frontend install
+pnpm --dir frontend dev
+```
+
+开发服务默认会跑在 Next 的端口上；实际登录和字幕请求仍需要 Python 本地服务提供 `/local/*` 动作。
+
+### 前端构建并同步到 Python 页面
+
+```powershell
+pnpm --dir frontend build
+```
+
+构建完成后会把 `frontend/out` 同步到 `src/bili_ai_sub/web_static`。随后运行 `uv run biliaisub web` 即可看到最新页面。
+
+## 命令行
+
+### 扫码登录
 
 ```powershell
 uv run biliaisub login
@@ -35,19 +77,19 @@ uv run biliaisub login
 - 在 `data/latest-login-qr.svg` 保存一份 SVG 二维码
 - 自动轮询直到扫码成功或超时
 
-### 2. 查看登录态
+### 查看登录态
 
 ```powershell
 uv run biliaisub status
 ```
 
-### 3. 清除登录态
+### 清除登录态
 
 ```powershell
 uv run biliaisub logout
 ```
 
-### 4. 获取 AI 字幕
+### 获取 AI 字幕
 
 输出纯文本：
 
@@ -91,94 +133,56 @@ with BilibiliClient(store=store) as client:
     print(render_srt(subtitle.segments))
 ```
 
-## 极简 HTTP API
+## 项目结构
 
-启动服务：
-
-```powershell
-uv run biliaisub serve --host 127.0.0.1 --port 8933
-```
-
-默认返回 JSON，并且自带最基础的 CORS 头，浏览器本地页面也可以直接调。
-
-### 接口列表
-
-- `GET /health`
-- `GET /status`
-- `POST /login/start`
-- `GET /login/poll?qrcode_key=...`
-- `POST /logout`
-- `GET /subtitles?source=BV1darmBcE4A&language=zh-Hans&include_raw=1`
-
-也兼容 `/api/*` 前缀，例如 `/api/health`、`/api/status`。
-
-### 示例
-
-查看健康状态：
-
-```powershell
-curl http://127.0.0.1:8933/health
-```
-
-启动二维码登录：
-
-```powershell
-curl -Method Post http://127.0.0.1:8933/login/start
-```
-
-获取字幕：
-
-```powershell
-curl "http://127.0.0.1:8933/subtitles?source=BV1darmBcE4A&language=zh-Hans&include_raw=1"
+```text
+src/bili_ai_sub/
+  bilibili.py              B 站扫码登录、登录态校验、字幕获取和格式化
+  cli.py                   命令行入口
+  models.py                轻量数据模型
+  store.py                 本机会话文件读写
+  web.py                   只绑定本机的网页工具服务
+  web_static/
+    ...                    Next 静态导出产物，由 pnpm --dir frontend build 生成
+frontend/
+  app/                     页面入口
+  components/              登录、视频输入、字幕列表、编辑和下载组件
+  lib/local-api.ts         调用 Python 本地服务的前端 API 封装
+  scripts/sync-static.mjs  构建后同步静态产物
+tests/
+  test_bilibili_utils.py   BV 解析、字幕轨选择
+  test_client.py           B 站客户端核心流程
+  test_store.py            本机会话存储
+  test_web.py              本地网页服务
 ```
 
 ## 测试
 
 ```powershell
-uv run pytest tests -q
+uv run python -m pytest tests -q
 ```
 
-## 浏览器插件开发
-
-浏览器插件代码位于 `extension/`，使用 `pnpm + TypeScript + React + Vite` 构建，目标是同一份 `MV3` 包同时兼容 Chrome 和 Edge。
-
-安装依赖并构建：
+前端类型检查：
 
 ```powershell
-pnpm install
-pnpm --dir extension build
+pnpm --dir frontend exec tsc --noEmit
 ```
 
-运行单测和 smoke 检查：
+完整前端构建：
 
 ```powershell
-pnpm --dir extension exec vitest run
-pnpm --dir extension exec playwright test
+pnpm --dir frontend build
 ```
 
-本地加载未打包发布前的扩展产物：
+## 提交与发布
 
-1. 打开 Chrome 或 Edge 的扩展管理页。
-2. 启用“开发者模式”。
-3. 选择“加载已解压的扩展程序”。
-4. 指向 `extension/dist` 目录。
+提交信息遵循约定式提交，详见 `docs/git-commit-guidelines.md`。
 
-生成商店图标和发布素材：
+本项目使用 Release Please 管理版本 PR、CHANGELOG、GitHub Release 和版本标签。普通功能提交不会直接打正式 tag；当多个变更积累到一个稳定发布点后，合并 Release Please 创建的发布 PR 才会发布版本。
 
-```powershell
-pwsh .\extension\scripts\generate-store-assets.ps1
-```
+## 设计边界
 
-发布清单与隐私草案：
-
-- [docs/publishing/browser-store-release-checklist.md](/F:/BiliAISub/docs/publishing/browser-store-release-checklist.md)
-- [docs/publishing/privacy-policy.md](/F:/BiliAISub/docs/publishing/privacy-policy.md)
-
-当前扩展约束：
-
-- 仅在 `https://www.bilibili.com/video/*` 页面启用字幕工作台。
-- 摘要 provider 仅支持 `OpenAI` 与 `阿里云百炼`，并固定使用官方域名预设。
-- 摘要请求统一走 OpenAI 兼容的 `POST /chat/completions`。
-- 用户 API Key 仅保存到 `chrome.storage.local`。
-- 摘要固定输出简体中文；如果 LLM 不可用或连接测试未通过，摘要功能直接不可用。
-- 公开版扩展不依赖本地 Python 环境、`localhost` 或 `127.0.0.1` 辅助服务。
+- 不包含浏览器插件代码
+- 不包含公开 HTTP API 契约
+- 不做字幕翻译、摘要、LLM 调用
+- 不托管任何远端服务，登录态只留在本机

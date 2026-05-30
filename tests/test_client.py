@@ -129,6 +129,58 @@ def test_fetch_ai_subtitle_returns_segments_text_and_srt(tmp_path) -> None:
     )
 
     assert resolved.language == "zh-hans"
+    assert resolved.label == "简体中文"
     assert resolved.text == "第一句\n第二句"
     assert [segment.text for segment in resolved.segments] == ["第一句", "第二句"]
     assert render_srt(resolved.segments).splitlines()[1] == "00:00:00,000 --> 00:00:02,500"
+
+
+def test_fetch_ai_subtitles_returns_all_available_languages(tmp_path) -> None:
+    store = SessionStore(tmp_path / "session.json")
+    store.save_active(
+        cookies={"SESSDATA": "sess-token", "DedeUserID": "12345"},
+        account={"mid": "12345", "uname": "tester"},
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "x/web-interface/view" in url:
+            return httpx.Response(200, json={"code": 0, "data": {"aid": 1001, "cid": 2002}})
+        if "x/player/wbi/v2" in url:
+            return httpx.Response(
+                200,
+                json={
+                    "code": 0,
+                    "data": {
+                        "subtitle": {
+                            "subtitles": [
+                                {
+                                    "lan": "en",
+                                    "lan_doc": "English",
+                                    "subtitle_url": "https://i0.hdslb.com/bfs/subtitle/en.json",
+                                },
+                                {
+                                    "lan": "zh-Hans",
+                                    "lan_doc": "简体中文",
+                                    "subtitle_url": "//i0.hdslb.com/bfs/subtitle/zh.json",
+                                },
+                            ]
+                        }
+                    },
+                },
+            )
+        if "bfs/subtitle/en.json" in url:
+            return httpx.Response(200, json={"body": [{"from": 0, "to": 1, "content": "Hello"}]})
+        if "bfs/subtitle/zh.json" in url:
+            return httpx.Response(200, json={"body": [{"from": 0, "to": 1, "content": "你好"}]})
+        raise AssertionError(f"unexpected request: {url}")
+
+    client = BilibiliClient(
+        store=store,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    subtitles = client.fetch_ai_subtitles("BV1darmBcE4A")
+
+    assert [subtitle.language for subtitle in subtitles] == ["en", "zh-hans"]
+    assert [subtitle.text for subtitle in subtitles] == ["Hello", "你好"]

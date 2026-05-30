@@ -27,7 +27,6 @@ class SessionSnapshot:
 class QrLoginSession:
     qrcode_key: str
     qrcode_url: str
-    expires_at: str
     poll_interval_ms: int
 
 
@@ -36,8 +35,6 @@ class QrPollResult:
     status: QrPollStatus
     account: Account | None
     message: str
-    expires_at: str | None = None
-    last_error: str | None = None
 
 
 @dataclass(slots=True)
@@ -45,7 +42,6 @@ class SubtitleTrack:
     language: str
     label: str
     subtitle_url: str
-    ext: str = "json"
 
 
 @dataclass(slots=True)
@@ -58,9 +54,8 @@ class SubtitleSegment:
 @dataclass(slots=True)
 class ResolvedSubtitle:
     language: str
+    label: str
     raw_subtitle_json: str
     segments: list[SubtitleSegment]
-    source: str
     subtitle_url: str
     text: str
-    track: SubtitleTrack

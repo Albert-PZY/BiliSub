@@ -3,7 +3,6 @@ from __future__ import annotations
 import io
 import json
 import re
-from datetime import UTC, datetime, timedelta
 from typing import Mapping
 
 import httpx
@@ -78,11 +77,9 @@ class BilibiliClient:
         if not qrcode_key or not qrcode_url:
             raise BilibiliError("生成 B 站扫码登录会话失败")
 
-        expires_at = (datetime.now(UTC) + timedelta(minutes=3)).isoformat().replace("+00:00", "Z")
         return QrLoginSession(
             qrcode_key=qrcode_key,
             qrcode_url=qrcode_url,
-            expires_at=expires_at,
             poll_interval_ms=1500,
         )
 
@@ -113,8 +110,6 @@ class BilibiliClient:
                 status="success",
                 account=account,
                 message="登录成功" if message == "0" else message,
-                expires_at=None,
-                last_error=None,
             )
 
         if poll_code == 86038:
@@ -123,22 +118,24 @@ class BilibiliClient:
                 status="expired",
                 account=None,
                 message=expired.last_error or "二维码已失效",
-                expires_at=expired.updated_at,
-                last_error=expired.last_error,
             )
 
         return QrPollResult(
             status=map_qr_poll_status(poll_code),
             account=None,
             message=message,
-            expires_at=None,
-            last_error=None,
         )
 
     def logout(self) -> None:
         self.store.clear()
 
     def fetch_ai_subtitle(self, source_input: str, preferred_language: str | None = None) -> ResolvedSubtitle:
+        subtitles = self.fetch_ai_subtitles(source_input, preferred_language=preferred_language)
+        if not subtitles:
+            raise BilibiliError("当前视频没有可用的 AI 字幕轨")
+        return subtitles[0]
+
+    def fetch_ai_subtitles(self, source_input: str, preferred_language: str | None = None) -> list[ResolvedSubtitle]:
         snapshot = self.store.load()
         if snapshot.status != "active" or not snapshot.cookies:
             raise BilibiliError("当前没有可用的 B 站登录态，请先执行 login")
@@ -170,36 +167,43 @@ class BilibiliClient:
             self.store.mark_expired("Bilibili 登录态已失效")
             raise BilibiliError("Bilibili 登录态已失效，请重新扫码登录")
 
-        track = choose_best_track(
+        tracks = select_subtitle_tracks(
             (player_payload.get("data", {}).get("subtitle", {}) or {}).get("subtitles", []),
             preferred_language=preferred_language,
         )
-        if track is None:
+        if not tracks:
             raise BilibiliError("当前视频没有可用的 AI 字幕轨")
 
-        subtitle_response = self.http.get(
-            track.subtitle_url,
-            headers=build_request_headers(cookie_header),
-        )
-        subtitle_payload = self._parse_json_response(subtitle_response)
-        if looks_like_expired_auth(subtitle_response.status_code, subtitle_payload):
-            self.store.mark_expired("Bilibili 登录态已失效")
-            raise BilibiliError("Bilibili 登录态已失效，请重新扫码登录")
+        subtitles: list[ResolvedSubtitle] = []
+        for track in tracks:
+            subtitle_response = self.http.get(
+                track.subtitle_url,
+                headers=build_request_headers(cookie_header),
+            )
+            subtitle_payload = self._parse_json_response(subtitle_response)
+            if looks_like_expired_auth(subtitle_response.status_code, subtitle_payload):
+                self.store.mark_expired("Bilibili 登录态已失效")
+                raise BilibiliError("Bilibili 登录态已失效，请重新扫码登录")
 
-        raw_subtitle_json = subtitle_response.text
-        segments = parse_subtitle_segments(raw_subtitle_json)
-        if not segments:
+            raw_subtitle_json = subtitle_response.text
+            segments = parse_subtitle_segments(raw_subtitle_json)
+            if not segments:
+                continue
+
+            subtitles.append(
+                ResolvedSubtitle(
+                    language=track.language,
+                    label=track.label or track.language,
+                    raw_subtitle_json=raw_subtitle_json,
+                    segments=segments,
+                    subtitle_url=track.subtitle_url,
+                    text=build_transcript_text(segments),
+                )
+            )
+
+        if not subtitles:
             raise BilibiliError("AI 字幕响应为空或无法解析")
-
-        return ResolvedSubtitle(
-            language=track.language,
-            raw_subtitle_json=raw_subtitle_json,
-            segments=segments,
-            source="bilibili-auth",
-            subtitle_url=track.subtitle_url,
-            text=build_transcript_text(segments),
-            track=track,
-        )
+        return subtitles
 
     def _fetch_account_summary(self, cookies: Mapping[str, str]) -> Account | None:
         response = self.http.get(
@@ -257,6 +261,14 @@ def extract_bvid(source_input: str) -> str | None:
 
 
 def choose_best_track(payload: list[Mapping[str, object]], preferred_language: str | None = None) -> SubtitleTrack | None:
+    tracks = select_subtitle_tracks(payload, preferred_language=preferred_language)
+    return tracks[0] if tracks else None
+
+
+def select_subtitle_tracks(
+    payload: list[Mapping[str, object]],
+    preferred_language: str | None = None,
+) -> list[SubtitleTrack]:
     tracks = []
     for item in payload:
         language = normalize_language(item.get("lan") or item.get("lang"))
@@ -272,17 +284,20 @@ def choose_best_track(payload: list[Mapping[str, object]], preferred_language: s
         )
 
     if not tracks:
-        return None
+        return []
 
     preferred_base = base_language(preferred_language)
-    return min(
+    sorted_tracks = sorted(
         tracks,
-        key=lambda track: (
-            rank_language(track.language, preferred_language),
-            int(base_language(track.language) != preferred_base),
-            track.language,
-        ),
+        key=lambda track: (rank_language(track.language, preferred_language), track.language),
     )
+    if not preferred_language:
+        return sorted_tracks
+    preferred = normalize_language(preferred_language)
+    exact_tracks = [track for track in sorted_tracks if track.language == preferred]
+    if exact_tracks:
+        return exact_tracks
+    return [track for track in sorted_tracks if base_language(track.language) == preferred_base]
 
 
 def parse_subtitle_segments(raw_json: str) -> list[SubtitleSegment]:
