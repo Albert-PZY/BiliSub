@@ -1,0 +1,52 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: .github/release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      - name: Sync moving version tags
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE_VERSION="$(python - <<'PY'
+          import tomllib
+          with open('pyproject.toml', 'rb') as file:
+              print(tomllib.load(file)['project']['version'])
+          PY
+          )"
+          MAJOR_VERSION="${PACKAGE_VERSION%%.*}"
+          MINOR_VERSION="$(python - "$PACKAGE_VERSION" <<'PY'
+          import sys
+          major, minor, *_ = sys.argv[1].split('.')
+          print(f'{major}.{minor}')
+          PY
+          )"
+          TARGET_SHA="${{ steps.release.outputs.sha }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f "v${MAJOR_VERSION}" "$TARGET_SHA"
+          git tag -f "v${MINOR_VERSION}" "$TARGET_SHA"
+          git push --force origin "refs/tags/v${MAJOR_VERSION}" "refs/tags/v${MINOR_VERSION}"
