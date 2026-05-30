@@ -83,7 +83,7 @@ pnpm dev
 
 ## 注意
 
-GitHub Pages 不能跑服务端接口，所以这个项目不再用 GitHub Pages 作为主部署方式。完整功能需要部署到 Vercel 或其他支持 Next.js 服务端运行的平台。
+完整功能需要部署到 Vercel 或其他支持 Next.js 服务端运行的平台。
 
 ## 提交与发布
 
