@@ -1,6 +1,0 @@
-1:"$Sreact.fragment"
-2:I[96237,["/_next/static/chunks/0.86smdh2.kl1.js","/_next/static/chunks/0-ueylp5djd8e.js"],"ViewportBoundary"]
-3:I[96237,["/_next/static/chunks/0.86smdh2.kl1.js","/_next/static/chunks/0-ueylp5djd8e.js"],"MetadataBoundary"]
-4:"$Sreact.suspense"
-5:I[15637,["/_next/static/chunks/0.86smdh2.kl1.js","/_next/static/chunks/0-ueylp5djd8e.js"],"IconMark"]
-0:{"rsc":["$","$1","h",{"children":[["$","meta",null,{"name":"robots","content":"noindex"}],["$","$L2",null,{"children":[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]}],["$","div",null,{"hidden":true,"children":["$","$L3",null,{"children":["$","$4",null,{"name":"Next.Metadata","children":[["$","title","0",{"children":"B站AI字幕工具"}],["$","meta","1",{"name":"description","content":"批量获取B站视频AI字幕，在线编辑，多格式下载"}],["$","link","2",{"rel":"icon","href":"/icon-light-32x32.png","media":"(prefers-color-scheme: light)"}],["$","link","3",{"rel":"icon","href":"/icon-dark-32x32.png","media":"(prefers-color-scheme: dark)"}],["$","link","4",{"rel":"icon","href":"/icon.svg","type":"image/svg+xml"}],["$","link","5",{"rel":"apple-touch-icon","href":"/apple-icon.png"}],["$","$L5","6",{}]]}]}]}],null]}],"isPartial":false,"staleTime":300,"varyParams":null,"buildId":"A913yABBlSOL5xozL6E5k"}

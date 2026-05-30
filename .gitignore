@@ -1,9 +1,6 @@
 .venv/
 .pytest_cache/
 __pycache__/
-dist/
-build/
-*.egg-info/
 .coverage
 htmlcov/
 *.log
@@ -17,7 +14,7 @@ data/selftest-*.json
 data/selftest-*.srt
 data/selftest-*.txt
 node_modules/
-frontend/.next/
-frontend/out/
-frontend/node_modules/
+.next/
+out/
+.vercel/
 NEXT_STEPS.md

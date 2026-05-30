@@ -30,19 +30,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          PACKAGE_VERSION="$(python - <<'PY'
-          import tomllib
-          with open('pyproject.toml', 'rb') as file:
-              print(tomllib.load(file)['project']['version'])
-          PY
-          )"
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
           MAJOR_VERSION="${PACKAGE_VERSION%%.*}"
-          MINOR_VERSION="$(python - "$PACKAGE_VERSION" <<'PY'
-          import sys
-          major, minor, *_ = sys.argv[1].split('.')
-          print(f'{major}.{minor}')
-          PY
-          )"
+          MINOR_VERSION="$(node -p "const [major, minor] = process.argv[1].split('.'); major + '.' + minor" "$PACKAGE_VERSION")"
           TARGET_SHA="${{ steps.release.outputs.sha }}"
 
           git config user.name "github-actions[bot]"

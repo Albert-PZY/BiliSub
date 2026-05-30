@@ -18,16 +18,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -39,27 +29,16 @@ jobs:
         with:
           node-version: 22.x
           cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install Python dependencies
-        run: uv sync --frozen
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Install frontend dependencies
-        run: pnpm --dir frontend install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
 
-      - name: Run Python tests
-        run: uv run python -m pytest tests -q
-
-      - name: Typecheck frontend
-        run: pnpm --dir frontend exec tsc --noEmit
-
-      - name: Build frontend
-        env:
-          SKIP_STATIC_SYNC: "true"
-        run: pnpm --dir frontend build
-
-      - name: Build Python package
-        run: uv build
+      - name: Build
+        run: pnpm build
 
   required-status:
     name: verify
