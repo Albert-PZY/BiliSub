@@ -1,4 +1,19 @@
-# BiliAISub
+<div align="center">
+  <img src="public/icon.svg" width="96" height="96" alt="BiliAISub Logo" />
+  <h1>BiliAISub</h1>
+  <p>扫码登录 B 站，获取官方 AI 字幕，按语言编辑并下载。</p>
+
+  <p>
+    <img alt="Next.js" src="https://img.shields.io/badge/Next.js-16-111318?logo=nextdotjs&logoColor=white" />
+    <img alt="React" src="https://img.shields.io/badge/React-19-2F6F9F?logo=react&logoColor=white" />
+    <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" />
+    <img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white" />
+    <img alt="pnpm" src="https://img.shields.io/badge/pnpm-11-F69220?logo=pnpm&logoColor=white" />
+    <img alt="Vercel" src="https://img.shields.io/badge/Vercel-ready-111318?logo=vercel&logoColor=white" />
+  </p>
+</div>
+
+## 简介
 
 BiliAISub 是一个 Next.js 全栈 TypeScript 应用，用来扫码登录 B 站并获取官方 AI 字幕。
 
@@ -11,6 +26,42 @@ BiliAISub 是一个 Next.js 全栈 TypeScript 应用，用来扫码登录 B 站�
 - 下载当前语言、当前视频全部语言或全部成功字幕的 TXT、SRT、JSON
 
 登录态保存在加密的 HttpOnly Cookie 里，前端 JS 读不到。生产环境必须设置 `BILI_SUB_SESSION_SECRET`。
+
+## 架构设计
+
+```mermaid
+flowchart TB
+  Browser[用户浏览器]
+
+  subgraph Client[客户端界面]
+    Page[app/page.tsx]
+    Components[components/*]
+    LocalApi[lib/local-api.ts]
+  end
+
+  subgraph Server[Next.js 服务端]
+    AuthApi[app/api/auth/*]
+    SubtitleApi[app/api/subtitles/route.ts]
+    Session[lib/server/session.ts\n加密 HttpOnly Cookie]
+    BiliClient[lib/server/bilibili.ts\nB 站接口封装 + 字幕解析]
+  end
+
+  subgraph External[外部服务]
+    Bilibili[Bilibili 登录 / 视频 / AI 字幕接口]
+  end
+
+  Browser --> Page
+  Page --> Components
+  Components --> LocalApi
+  LocalApi --> AuthApi
+  LocalApi --> SubtitleApi
+  AuthApi <--> Session
+  SubtitleApi --> Session
+  AuthApi <--> BiliClient
+  SubtitleApi --> BiliClient
+  BiliClient <--> Bilibili
+  Components --> Download[浏览器下载\nTXT / SRT / JSON]
+```
 
 ## 本地启动
 
