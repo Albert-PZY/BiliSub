@@ -1,7 +1,7 @@
 {
   "packages": {
     ".": {
-      "release-type": "python",
+      "release-type": "node",
       "package-name": "bili-ai-sub"
     }
   },

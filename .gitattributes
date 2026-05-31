@@ -7,5 +7,3 @@
 *.webp binary
 *.ico binary
 *.zip binary
-
-src/bili_ai_sub/web_static/** -whitespace

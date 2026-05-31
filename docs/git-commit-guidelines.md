@@ -15,11 +15,11 @@
 常用写法：
 
 ```text
-feat: add local subtitle web app
-fix(subtitle): preserve all language tracks
-docs: update setup guide
-ci: deploy frontend to github pages
-feat!: change session file schema
+feat: add vercel api routes
+fix(auth): refresh expired session cookie
+docs: update vercel deployment guide
+ci: verify next app build
+feat!: remove python cli
 ```
 
 ## type 取值
@@ -40,8 +40,8 @@ feat!: change session file schema
 
 - 不同功能分开提交，业务能力、CI、文档不要混在同一个提交里。
 - 每个提交只表达一个清晰意图，描述使用英文小写开头，末尾不加句号。
-- 不提交本地登录态、二维码、自测字幕、依赖目录、构建缓存和临时验证文件。
-- 涉及行为变化时，提交前至少运行后端测试、前端类型检查和前端构建。
+- 不提交本地登录态、依赖目录、构建缓存和临时验证文件。
+- 涉及行为变化时，提交前至少运行类型检查和构建。
 
 ## 版本号规范
 
@@ -65,8 +65,7 @@ feat!: change session file schema
 提交前运行：
 
 ```powershell
-uv run python -m pytest tests -q
-pnpm --dir frontend exec tsc --noEmit
-pnpm --dir frontend build
+pnpm typecheck
+pnpm build
 git diff --check
 ```

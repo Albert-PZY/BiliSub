@@ -1,188 +1,92 @@
 # BiliAISub
 
-一个极简、独立的 B 站 AI 字幕获取工具。
+BiliAISub 是一个 Next.js 全栈 TypeScript 应用，用来扫码登录 B 站并获取官方 AI 字幕。
 
-它只做三件事：
+它只保留当前核心能力：
 
-- 扫码登录 B 站，并把登录态保存到本机
+- B 站扫码登录
 - 通过 BV 号或 B 站视频链接获取官方 AI 字幕
-- 支持命令行导出，也支持本地网页批量提取和下载
+- 一次获取全部可用字幕语言，或只获取指定语言
+- 在页面右侧按语言标签切换编辑
+- 下载当前语言、当前视频全部语言或全部成功字幕的 TXT、SRT、JSON
 
-本地会话默认保存到 `data/session.json`。这个文件不做额外加密，适合个人本机使用，不要提交到仓库或发给他人。
+登录态保存在加密的 HttpOnly Cookie 里，前端 JS 读不到。生产环境必须设置 `BILI_SUB_SESSION_SECRET`。
 
-## 安装
-
-```powershell
-cd "F:\in-house project\BiliAISub"
-uv sync
-```
-
-## 本地网页工具
-
-启动：
+## 本地启动
 
 ```powershell
-uv run biliaisub web
+pnpm install
+pnpm dev
 ```
 
-默认地址：
+打开：
 
 ```text
-http://127.0.0.1:8933
+http://localhost:3000
 ```
 
-页面能力：
+本地开发不配置 `BILI_SUB_SESSION_SECRET` 也能跑，生产环境不能省。
 
-- 生成 B 站扫码登录二维码
-- 查看和清除本机登录态
-- 粘贴多行 BV 号或 B 站视频链接
-- 批量获取全部可用 AI 字幕语言，或只获取指定语言
-- 在右侧按语言标签页切换编辑
-- 按当前语言、当前视频全部语言或全部成功字幕下载 TXT、SRT、JSON
+## 环境变量
 
-网页前端位于 `frontend/`，使用 Next.js 静态导出。Python 只负责本机页面服务、扫码登录、保存登录态和请求 B 站字幕。
+生产环境必填：
 
-### GitHub Pages
+```text
+BILI_SUB_SESSION_SECRET=一串足够长的随机字符串
+```
 
-项目会通过 GitHub Actions 自动把 `frontend/` 静态页面部署到 GitHub Pages。Pages 页面只适合作为公开展示和静态入口；真实扫码登录、登录态读取和 B 站字幕请求必须在本机运行 `uv run biliaisub web` 后由本地 Python 服务提供。
-
-### 前端开发
+生成一串可用密钥：
 
 ```powershell
-pnpm --dir frontend install
-pnpm --dir frontend dev
-```
-
-开发服务默认会跑在 Next 的端口上；实际登录和字幕请求仍需要 Python 本地服务提供 `/local/*` 动作。
-
-### 前端构建并同步到 Python 页面
-
-```powershell
-pnpm --dir frontend build
-```
-
-构建完成后会把 `frontend/out` 同步到 `src/bili_ai_sub/web_static`。随后运行 `uv run biliaisub web` 即可看到最新页面。
-
-## 命令行
-
-### 扫码登录
-
-```powershell
-uv run biliaisub login
-```
-
-执行后会：
-
-- 在终端打印可扫码的 ASCII 二维码
-- 在 `data/latest-login-qr.svg` 保存一份 SVG 二维码
-- 自动轮询直到扫码成功或超时
-
-### 查看登录态
-
-```powershell
-uv run biliaisub status
-```
-
-### 清除登录态
-
-```powershell
-uv run biliaisub logout
-```
-
-### 获取 AI 字幕
-
-输出纯文本：
-
-```powershell
-uv run biliaisub subtitles BV1darmBcE4A
-```
-
-指定 B 站链接：
-
-```powershell
-uv run biliaisub subtitles "https://www.bilibili.com/video/BV1darmBcE4A"
-```
-
-导出 SRT：
-
-```powershell
-uv run biliaisub subtitles BV1darmBcE4A --format srt --output .\demo.srt
-```
-
-导出原始 AI 字幕 JSON：
-
-```powershell
-uv run biliaisub subtitles BV1darmBcE4A --format raw-json --output .\demo.json
-```
-
-指定目标语言优先级：
-
-```powershell
-uv run biliaisub subtitles BV1darmBcE4A --language zh-Hans
-```
-
-## 作为库使用
-
-```python
-from bili_ai_sub import BilibiliClient, SessionStore, render_srt
-
-store = SessionStore()
-with BilibiliClient(store=store) as client:
-    subtitle = client.fetch_ai_subtitle("BV1darmBcE4A", preferred_language="zh-Hans")
-    print(subtitle.text)
-    print(render_srt(subtitle.segments))
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 ## 项目结构
 
 ```text
-src/bili_ai_sub/
-  bilibili.py              B 站扫码登录、登录态校验、字幕获取和格式化
-  cli.py                   命令行入口
-  models.py                轻量数据模型
-  store.py                 本机会话文件读写
-  web.py                   只绑定本机的网页工具服务
-  web_static/
-    ...                    Next 静态导出产物，由 pnpm --dir frontend build 生成
-frontend/
-  app/                     页面入口
-  components/              登录、视频输入、字幕列表、编辑和下载组件
-  lib/local-api.ts         调用 Python 本地服务的前端 API 封装
-  scripts/sync-static.mjs  构建后同步静态产物
-tests/
-  test_bilibili_utils.py   BV 解析、字幕轨选择
-  test_client.py           B 站客户端核心流程
-  test_store.py            本机会话存储
-  test_web.py              本地网页服务
+app/
+  api/
+    auth/status/route.ts        检查登录态
+    auth/login/start/route.ts   生成扫码登录二维码
+    auth/login/poll/route.ts    轮询扫码登录结果并写入加密 Cookie
+    auth/logout/route.ts        清除登录态
+    subtitles/route.ts          获取字幕
+  page.tsx                      页面入口
+components/                     页面组件
+lib/local-api.ts                前端 API 类型和请求工具
+lib/server/bilibili.ts          B 站接口、字幕解析、SRT 渲染
+lib/server/session.ts           加密 HttpOnly Cookie 会话
+vercel.json                     Vercel 部署配置
 ```
 
-## 测试
+## 常用命令
 
 ```powershell
-uv run python -m pytest tests -q
+pnpm typecheck
+pnpm build
+pnpm dev
 ```
 
-前端类型检查：
+## 部署到 Vercel
 
-```powershell
-pnpm --dir frontend exec tsc --noEmit
-```
+1. 登录 `https://vercel.com`。
+2. 点 `Add New...`，选 `Project`。
+3. 选择 GitHub 仓库 `Albert-PZY/BiliSub`。
+4. Framework 保持 `Next.js`。
+5. Root Directory 保持 `./`。
+6. Install Command 使用 `pnpm install --frozen-lockfile`。
+7. Build Command 使用 `pnpm build`。
+8. 添加环境变量 `BILI_SUB_SESSION_SECRET`。
+9. 点 `Deploy`。
 
-完整前端构建：
+以后合并到 `main`，Vercel 会自动重新部署。
 
-```powershell
-pnpm --dir frontend build
-```
+## 注意
+
+完整功能需要部署到 Vercel 或其他支持 Next.js 服务端运行的平台。
 
 ## 提交与发布
 
 提交信息遵循约定式提交，详见 `docs/git-commit-guidelines.md`。
 
-本项目使用 Release Please 管理版本 PR、CHANGELOG、GitHub Release 和版本标签。普通功能提交不会直接打正式 tag；当多个变更积累到一个稳定发布点后，合并 Release Please 创建的发布 PR 才会发布版本。
-
-## 设计边界
-
-- 不包含浏览器插件代码
-- 不包含公开 HTTP API 契约
-- 不做字幕翻译、摘要、LLM 调用
-- 不托管任何远端服务，登录态只留在本机
+Release Please 只创建发布 PR，不会因为普通提交直接打正式 tag。等多个变更积累到稳定发布点后，再合并发布 PR。
