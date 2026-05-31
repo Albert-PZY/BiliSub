@@ -1,13 +1,17 @@
 "use client"
 
 import { useState } from "react"
+import { Github } from "lucide-react"
 import { DownloadPanel } from "@/components/download-panel"
 import { QrLogin } from "@/components/qr-login"
 import { SubtitleEditor } from "@/components/subtitle-editor"
 import { SubtitleItem, SubtitleList, type SubtitleVariant } from "@/components/subtitle-list"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { Button } from "@/components/ui/button"
 import { VideoInput, type SubtitleLanguageMode } from "@/components/video-input"
 import { postJson, type SubtitleResult } from "@/lib/local-api"
+
+const GITHUB_REPOSITORY_URL = "https://github.com/Albert-PZY/BiliSub"
 
 export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -122,6 +126,11 @@ export default function Home() {
           <h1 className="text-lg font-semibold text-foreground">B站AI字幕工具</h1>
           <div className="flex items-center gap-3">
             {isLoggedIn && <span className="text-xs text-muted-foreground">已登录</span>}
+            <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+              <a href={GITHUB_REPOSITORY_URL} target="_blank" rel="noreferrer" aria-label="打开 GitHub 仓库">
+                <Github className="h-4 w-4" />
+              </a>
+            </Button>
             <ThemeToggle />
           </div>
         </div>
