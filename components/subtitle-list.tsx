@@ -13,6 +13,9 @@ export interface SubtitleVariant {
 export interface SubtitleItem {
   id: string
   bvid: string
+  cid?: string
+  page?: number
+  part?: string
   title: string
   status: "loading" | "success" | "error" | "no-subtitle"
   subtitles?: SubtitleVariant[]

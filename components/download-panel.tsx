@@ -36,7 +36,7 @@ export function DownloadPanel({ selected, selectedLanguage, editedContent, items
     for (const target of targets) {
       const output = buildOutput(target.variant, format, target.editedContent)
       if (!output) continue
-      download(`${safeFileName(target.item.bvid)}.${safeFileName(target.variant.language)}.${format}`, output)
+      download(`${buildSubtitleFileStem(target.item)}.${safeFileName(target.variant.language)}.${format}`, output)
     }
   }
 
@@ -158,4 +158,11 @@ function download(fileName: string, content: string) {
 function safeFileName(value: string): string {
   const match = value.match(/BV[0-9A-Za-z]{10}/)
   return (match ? match[0] : value).replace(/[\\/:*?"<>|]+/g, "_").slice(0, 80) || "bili-ai-sub"
+}
+
+function buildSubtitleFileStem(item: SubtitleItem): string {
+  const bvid = safeFileName(item.bvid)
+  if (item.page) return `${bvid}.P${String(item.page).padStart(2, "0")}`
+  if (item.cid) return `${bvid}.${safeFileName(item.cid)}`
+  return bvid
 }
