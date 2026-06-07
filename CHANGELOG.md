@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.1](https://github.com/Albert-PZY/BiliSub/compare/v1.0.0...v1.0.1) (2026-06-07)
+
+
+### Bug Fixes
+
+* fetch subtitles for all video parts ([f16eb93](https://github.com/Albert-PZY/BiliSub/commit/f16eb93c1c36ebf333a8631fbbc8bd5484b11f04))
+* fetch subtitles for all video parts ([56d9e74](https://github.com/Albert-PZY/BiliSub/commit/56d9e747cc3f9a8a6ce18b02ef5771b80b9f1676))
+
 ## [1.0.0](https://github.com/Albert-PZY/BiliSub/compare/v0.1.0...v1.0.0) (2026-05-31)
 
 
