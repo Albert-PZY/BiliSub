@@ -25,7 +25,7 @@ export type ResolvedSubtitle = {
   subtitle_url: string
 }
 
-export type ResolvedSubtitlePage = {
+export type ResolvedVideoPage = {
   source: string
   bvid: string
   aid: string
@@ -33,6 +33,17 @@ export type ResolvedSubtitlePage = {
   page: number
   title: string
   part: string
+}
+
+export type ResolvedVideo = {
+  source: string
+  bvid: string
+  aid: string
+  title: string
+  pages: ResolvedVideoPage[]
+}
+
+export type ResolvedSubtitlePage = ResolvedVideoPage & {
   subtitles: ResolvedSubtitle[]
 }
 
@@ -164,6 +175,17 @@ export async function fetchAiSubtitles(
   cookies: Record<string, string>,
   preferredLanguage?: string | null,
 ): Promise<ResolvedSubtitlePage[]> {
+  const video = await resolveVideo(sourceInput)
+  const items: ResolvedSubtitlePage[] = []
+
+  for (const page of video.pages) {
+    items.push(await fetchAiSubtitlesForPage(page, cookies, preferredLanguage))
+  }
+
+  return items
+}
+
+export async function resolveVideo(sourceInput: string): Promise<ResolvedVideo> {
   const bvid = extractBvid(sourceInput)
   if (!bvid) {
     throw new BilibiliError("无法从输入中解析 BV 号")
@@ -175,47 +197,47 @@ export async function fetchAiSubtitles(
   const viewData = asRecord(viewPayload.data)
   const aid = String(viewData.aid ?? "").trim()
   const title = String(viewData.title ?? bvid).trim() || bvid
-  const pages = resolveVideoPages(viewData)
+  const pages = resolveVideoPages(viewData).map((page) => ({
+    source: sourceInput,
+    bvid,
+    aid,
+    cid: page.cid,
+    page: page.page,
+    title,
+    part: page.part,
+  }))
   if (!aid || pages.length === 0) {
     throw new BilibiliError("未能解析视频 aid/cid")
   }
 
-  const cookieHeader = buildCookieHeader(cookies)
-  const items: ResolvedSubtitlePage[] = []
-
-  for (const page of pages) {
-    const subtitles = await fetchPageAiSubtitles({
-      aid,
-      cid: page.cid,
-      cookieHeader,
-      preferredLanguage,
-    })
-    items.push({
-      source: sourceInput,
-      bvid,
-      aid,
-      cid: page.cid,
-      page: page.page,
-      title,
-      part: page.part,
-      subtitles,
-    })
+  return {
+    source: sourceInput,
+    bvid,
+    aid,
+    title,
+    pages,
   }
-
-  return items
 }
 
-async function fetchPageAiSubtitles({
-  aid,
-  cid,
-  cookieHeader,
-  preferredLanguage,
-}: {
-  aid: string
-  cid: string
-  cookieHeader: string
-  preferredLanguage?: string | null
-}): Promise<ResolvedSubtitle[]> {
+export async function fetchAiSubtitlesForPage(
+  page: ResolvedVideoPage,
+  cookies: Record<string, string>,
+  preferredLanguage?: string | null,
+): Promise<ResolvedSubtitlePage> {
+  const cookieHeader = buildCookieHeader(cookies)
+  const subtitles = await fetchPageAiSubtitles(page.aid, page.cid, cookieHeader, preferredLanguage)
+  return {
+    ...page,
+    subtitles,
+  }
+}
+
+async function fetchPageAiSubtitles(
+  aid: string,
+  cid: string,
+  cookieHeader: string,
+  preferredLanguage?: string | null,
+): Promise<ResolvedSubtitle[]> {
   const playerResponse = await fetch(
     `https://api.bilibili.com/x/player/wbi/v2?${new URLSearchParams({ aid, cid })}`,
     {

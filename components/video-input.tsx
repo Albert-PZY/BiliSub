@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Check, ChevronDown, Languages, Plus, Trash2, Link } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-type VideoSource = {
+export type VideoSource = {
   id: string
   url: string
 }
@@ -182,7 +182,7 @@ export function VideoInput({
             ))}
           </div>
           <Button onClick={handleSubmit} disabled={disabled} className="w-full" size="sm">
-            获取字幕
+            解析视频
           </Button>
         </div>
       )}

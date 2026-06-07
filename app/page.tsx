@@ -8,8 +8,17 @@ import { SubtitleEditor } from "@/components/subtitle-editor"
 import { SubtitleItem, SubtitleList, type SubtitleVariant } from "@/components/subtitle-list"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
-import { VideoInput, type SubtitleLanguageMode } from "@/components/video-input"
-import { postJson, type SubtitleResult } from "@/lib/local-api"
+import { VideoInput, type SubtitleLanguageMode, type VideoSource } from "@/components/video-input"
+import { VideoPageSelector } from "@/components/video-page-selector"
+import {
+  buildVideoPageId,
+  postJson,
+  streamPostJson,
+  type ResolvedVideoPageResult,
+  type ResolvedVideoResult,
+  type SubtitleResult,
+  type SubtitleStreamEvent,
+} from "@/lib/local-api"
 
 const GITHUB_REPOSITORY_URL = "https://github.com/Albert-PZY/BiliSub"
 
@@ -19,69 +28,151 @@ export default function Home() {
   const [selectedSubtitle, setSelectedSubtitle] = useState<SubtitleItem | null>(null)
   const [selectedLanguage, setSelectedLanguage] = useState("")
   const [editedContent, setEditedContent] = useState("")
+  const [resolvedVideos, setResolvedVideos] = useState<ResolvedVideoResult[]>([])
+  const [selectedPageIds, setSelectedPageIds] = useState<Set<string>>(new Set())
+  const [subtitleLanguage, setSubtitleLanguage] = useState<SubtitleLanguageMode>("all")
+  const [isResolving, setIsResolving] = useState(false)
   const [isFetching, setIsFetching] = useState(false)
   const selectedVariant = findVariant(selectedSubtitle, selectedLanguage)
 
   const handleLogout = () => {
     setIsLoggedIn(false)
     setSubtitles([])
+    setResolvedVideos([])
+    setSelectedPageIds(new Set())
     setSelectedSubtitle(null)
     setSelectedLanguage("")
     setEditedContent("")
   }
 
-  const handleFetchSubtitles = async (videos: { id: string; url: string }[], language: SubtitleLanguageMode) => {
-    const loadingItems: SubtitleItem[] = videos.map((video, index) => ({
-      id: video.id,
-      bvid: video.url,
-      title: `视频 ${index + 1}: ${video.url}`,
-      status: "loading",
-    }))
+  const handleResolveVideos = async (videos: VideoSource[], language: SubtitleLanguageMode) => {
+    setIsResolving(true)
+    setSubtitleLanguage(language)
+    setResolvedVideos([])
+    setSelectedPageIds(new Set())
+    setSubtitles([])
+    setSelectedSubtitle(null)
+    setSelectedLanguage("")
+    setEditedContent("")
+
+    let pagesToFetch: ResolvedVideoPageResult[] | null = null
+    let initialItems: SubtitleItem[] = []
+
+    try {
+      const payload = await postJson<{ items: ResolvedVideoResult[] }>("/api/videos/resolve", {
+        sources: videos.map((video) => video.url),
+      })
+      const items = payload.items
+      const pages = items.flatMap((item) => item.pages ?? [])
+      const resolveErrorItems = items.filter((item) => !item.ok).map(buildResolveErrorItem)
+      const hasMultiPartVideo = items.some((item) => (item.pages?.length ?? 0) > 1)
+      const defaultSelectedPages = hasMultiPartVideo
+        ? items.flatMap((item) => ((item.pages?.length ?? 0) === 1 ? item.pages ?? [] : []))
+        : pages
+
+      if (hasMultiPartVideo) {
+        setResolvedVideos(items)
+        setSelectedPageIds(new Set(defaultSelectedPages.map(buildVideoPageId)))
+      }
+
+      if (!hasMultiPartVideo && pages.length > 0) {
+        pagesToFetch = pages
+        initialItems = resolveErrorItems
+      }
+
+      if (pages.length === 0) {
+        setSubtitles(resolveErrorItems.length > 0 ? resolveErrorItems : items.map(buildResolveErrorItem))
+      } else if (hasMultiPartVideo && resolveErrorItems.length > 0) {
+        setSubtitles(resolveErrorItems)
+      }
+    } catch (error) {
+      setSubtitles(videos.map((video, index) => buildRequestErrorItem(video.url, index, error)))
+    } finally {
+      setIsResolving(false)
+    }
+
+    if (pagesToFetch) {
+      await fetchSubtitlesForPages(pagesToFetch, language, initialItems)
+    }
+  }
+
+  const fetchSubtitlesForPages = async (
+    pages: ResolvedVideoPageResult[],
+    language: SubtitleLanguageMode,
+    initialItems: SubtitleItem[] = [],
+  ) => {
+    const loadingItems = pages.map(buildLoadingItemFromPage)
+    let hasSelectedFirstSuccess = false
 
     setIsFetching(true)
-    setSubtitles(loadingItems)
+    setSubtitles([...initialItems, ...loadingItems])
     setSelectedSubtitle(null)
     setSelectedLanguage("")
     setEditedContent("")
 
     try {
-      const payload = await postJson<{ items: SubtitleResult[] }>("/api/subtitles", {
-        sources: videos.map((video) => video.url),
-        language,
-      })
-      const nextItems = payload.items.map((item, index) => {
-        const base = buildSubtitleItemBase(item, loadingItems[index])
-        if (!item.ok) {
-          return {
-            ...base,
-            status: "error" as const,
-            error: item.error || "获取失败",
+      await streamPostJson<SubtitleStreamEvent>(
+        "/api/subtitles",
+        {
+          pages,
+          language,
+        },
+        (event) => {
+          if (event.type === "done") return
+          const nextItem = buildSubtitleItemFromResult(event.item)
+          setSubtitles((prev) => upsertSubtitleItem(prev, nextItem))
+
+          if (nextItem.status === "success" && !hasSelectedFirstSuccess) {
+            hasSelectedFirstSuccess = true
+            handleSelectSubtitle(nextItem)
           }
-        }
-        const variants = toSubtitleVariants(item)
-        return {
-          ...base,
-          status: variants.length > 0 ? ("success" as const) : ("no-subtitle" as const),
-          subtitles: variants,
-        }
-      })
-      setSubtitles(nextItems)
-      const firstSuccess = nextItems.find((item) => item.status === "success") ?? null
-      const firstLanguage = firstSuccess?.subtitles?.[0]?.language ?? ""
-      setSelectedSubtitle(firstSuccess)
-      setSelectedLanguage(firstLanguage)
-      setEditedContent(firstSuccess?.subtitles?.[0]?.content ?? "")
+        },
+      )
     } catch (error) {
       setSubtitles((prev) =>
-        prev.map((item) => ({
-          ...item,
-          status: "error" as const,
-          error: error instanceof Error ? error.message : "获取失败",
-        })),
+        prev.map((item) =>
+          item.status === "loading"
+            ? {
+                ...item,
+                status: "error" as const,
+                error: error instanceof Error ? error.message : "获取失败",
+              }
+            : item,
+        ),
       )
     } finally {
       setIsFetching(false)
     }
+  }
+
+  const handleTogglePage = (page: ResolvedVideoPageResult) => {
+    const pageId = buildVideoPageId(page)
+    setSelectedPageIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(pageId)) {
+        next.delete(pageId)
+      } else {
+        next.add(pageId)
+      }
+      return next
+    })
+  }
+
+  const handleSelectAllPages = () => {
+    const pages = resolvedVideos.flatMap((video) => video.pages ?? [])
+    setSelectedPageIds(new Set(pages.map(buildVideoPageId)))
+  }
+
+  const handleClearSelectedPages = () => {
+    setSelectedPageIds(new Set())
+  }
+
+  const handleFetchSelectedPages = async () => {
+    const pages = resolvedVideos
+      .flatMap((video) => video.pages ?? [])
+      .filter((page) => selectedPageIds.has(buildVideoPageId(page)))
+    const resolveErrorItems = resolvedVideos.filter((item) => !item.ok).map(buildResolveErrorItem)
+    await fetchSubtitlesForPages(pages, subtitleLanguage, resolveErrorItems)
   }
 
   const handleSelectSubtitle = (item: SubtitleItem) => {
@@ -142,7 +233,21 @@ export default function Home() {
             {isLoggedIn && (
               <section className="p-4 rounded-lg border border-border bg-card">
                 <h2 className="text-sm font-medium text-foreground mb-4">添加视频</h2>
-                <VideoInput onSubmit={handleFetchSubtitles} disabled={!isLoggedIn || isFetching} />
+                <VideoInput onSubmit={handleResolveVideos} disabled={!isLoggedIn || isResolving || isFetching} />
+              </section>
+            )}
+
+            {isLoggedIn && resolvedVideos.length > 0 && (
+              <section className="p-4 rounded-lg border border-border bg-card">
+                <VideoPageSelector
+                  videos={resolvedVideos}
+                  selectedIds={selectedPageIds}
+                  disabled={isResolving || isFetching}
+                  onTogglePage={handleTogglePage}
+                  onSelectAll={handleSelectAllPages}
+                  onClear={handleClearSelectedPages}
+                  onSubmit={handleFetchSelectedPages}
+                />
               </section>
             )}
 
@@ -254,7 +359,63 @@ function buildSubtitleItemBase(item: SubtitleResult, fallback?: SubtitleItem): S
   }
 }
 
-function formatSubtitleTitle(item: SubtitleResult): string {
+function buildLoadingItemFromPage(page: ResolvedVideoPageResult): SubtitleItem {
+  return {
+    id: buildVideoPageId(page),
+    bvid: page.bvid,
+    cid: page.cid,
+    page: page.page,
+    part: page.part,
+    title: formatSubtitleTitle(page),
+    status: "loading",
+  }
+}
+
+function buildSubtitleItemFromResult(item: SubtitleResult): SubtitleItem {
+  const base = buildSubtitleItemBase(item)
+  if (!item.ok) {
+    return {
+      ...base,
+      status: "error",
+      error: item.error || "获取失败",
+    }
+  }
+
+  const variants = toSubtitleVariants(item)
+  return {
+    ...base,
+    status: variants.length > 0 ? "success" : "no-subtitle",
+    subtitles: variants,
+  }
+}
+
+function buildResolveErrorItem(item: ResolvedVideoResult): SubtitleItem {
+  return {
+    id: item.bvid || item.source || crypto.randomUUID(),
+    bvid: item.bvid || item.source,
+    title: item.title || item.source,
+    status: "error",
+    error: item.error || "解析视频失败",
+  }
+}
+
+function buildRequestErrorItem(source: string, index: number, error: unknown): SubtitleItem {
+  return {
+    id: `${source || "video"}:${index}`,
+    bvid: source,
+    title: source || `视频 ${index + 1}`,
+    status: "error",
+    error: error instanceof Error ? error.message : "请求失败",
+  }
+}
+
+function upsertSubtitleItem(items: SubtitleItem[], nextItem: SubtitleItem): SubtitleItem[] {
+  const index = items.findIndex((item) => item.id === nextItem.id)
+  if (index < 0) return [...items, nextItem]
+  return items.map((item, itemIndex) => (itemIndex === index ? nextItem : item))
+}
+
+function formatSubtitleTitle(item: Pick<SubtitleResult, "page" | "part" | "source" | "title">): string {
   const title = (item.title || item.source || "").trim()
   const part = (item.part || "").trim()
   const page = typeof item.page === "number" && item.page > 0 ? item.page : undefined
