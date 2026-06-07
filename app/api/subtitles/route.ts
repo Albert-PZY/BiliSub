@@ -26,18 +26,33 @@ export async function POST(request: NextRequest) {
   const items = []
   for (const source of sources) {
     try {
-      const subtitles = await fetchAiSubtitles(source, session.cookies, preferredLanguage)
-      items.push({
-        ok: true,
-        source,
-        subtitles: subtitles.map((subtitle) => ({
-          language: subtitle.language,
-          label: subtitle.label,
-          text: subtitle.text,
-          srt: subtitle.srt,
-          raw_json: subtitle.raw_json,
-        })),
-      })
+      const pages = await fetchAiSubtitles(source, session.cookies, preferredLanguage)
+      for (const page of pages) {
+        items.push({
+          ok: true,
+          source: page.source,
+          bvid: page.bvid,
+          aid: page.aid,
+          cid: page.cid,
+          page: page.page,
+          title: page.title,
+          part: page.part,
+          subtitles: page.subtitles.map((subtitle) => ({
+            language: subtitle.language,
+            label: subtitle.label,
+            text: subtitle.text,
+            srt: subtitle.srt,
+            raw_json: subtitle.raw_json,
+          })),
+        })
+      }
+      if (pages.length === 0) {
+        items.push({
+          ok: false,
+          source,
+          error: "当前视频没有可用分P",
+        })
+      }
     } catch (error) {
       items.push({
         ok: false,

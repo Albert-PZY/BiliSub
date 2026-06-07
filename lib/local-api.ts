@@ -32,6 +32,12 @@ export type SubtitleVariantResult = {
 export type SubtitleResult = {
   ok: boolean
   source: string
+  bvid?: string
+  aid?: string
+  cid?: string
+  page?: number
+  title?: string
+  part?: string
   subtitles?: SubtitleVariantResult[]
   error?: string
 }

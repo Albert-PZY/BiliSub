@@ -25,10 +25,27 @@ export type ResolvedSubtitle = {
   subtitle_url: string
 }
 
+export type ResolvedSubtitlePage = {
+  source: string
+  bvid: string
+  aid: string
+  cid: string
+  page: number
+  title: string
+  part: string
+  subtitles: ResolvedSubtitle[]
+}
+
 type SubtitleTrack = {
   language: string
   label: string
   subtitle_url: string
+}
+
+type VideoPage = {
+  cid: string
+  page: number
+  part: string
 }
 
 type SubtitleSegment = {
@@ -146,7 +163,7 @@ export async function fetchAiSubtitles(
   sourceInput: string,
   cookies: Record<string, string>,
   preferredLanguage?: string | null,
-): Promise<ResolvedSubtitle[]> {
+): Promise<ResolvedSubtitlePage[]> {
   const bvid = extractBvid(sourceInput)
   if (!bvid) {
     throw new BilibiliError("无法从输入中解析 BV 号")
@@ -157,13 +174,48 @@ export async function fetchAiSubtitles(
   )
   const viewData = asRecord(viewPayload.data)
   const aid = String(viewData.aid ?? "").trim()
-  const pages = Array.isArray(viewData.pages) ? viewData.pages : []
-  const cid = String(viewData.cid ?? asRecord(pages[0]).cid ?? "").trim()
-  if (!aid || !cid) {
+  const title = String(viewData.title ?? bvid).trim() || bvid
+  const pages = resolveVideoPages(viewData)
+  if (!aid || pages.length === 0) {
     throw new BilibiliError("未能解析视频 aid/cid")
   }
 
   const cookieHeader = buildCookieHeader(cookies)
+  const items: ResolvedSubtitlePage[] = []
+
+  for (const page of pages) {
+    const subtitles = await fetchPageAiSubtitles({
+      aid,
+      cid: page.cid,
+      cookieHeader,
+      preferredLanguage,
+    })
+    items.push({
+      source: sourceInput,
+      bvid,
+      aid,
+      cid: page.cid,
+      page: page.page,
+      title,
+      part: page.part,
+      subtitles,
+    })
+  }
+
+  return items
+}
+
+async function fetchPageAiSubtitles({
+  aid,
+  cid,
+  cookieHeader,
+  preferredLanguage,
+}: {
+  aid: string
+  cid: string
+  cookieHeader: string
+  preferredLanguage?: string | null
+}): Promise<ResolvedSubtitle[]> {
   const playerResponse = await fetch(
     `https://api.bilibili.com/x/player/wbi/v2?${new URLSearchParams({ aid, cid })}`,
     {
@@ -181,7 +233,7 @@ export async function fetchAiSubtitles(
   const rawTracks = Array.isArray(subtitleData.subtitles) ? subtitleData.subtitles : []
   const tracks = selectSubtitleTracks(rawTracks, preferredLanguage)
   if (tracks.length === 0) {
-    throw new BilibiliError("当前视频没有可用的 AI 字幕轨")
+    return []
   }
 
   const subtitles: ResolvedSubtitle[] = []
@@ -214,9 +266,6 @@ export async function fetchAiSubtitles(
     })
   }
 
-  if (subtitles.length === 0) {
-    throw new BilibiliError("AI 字幕响应为空或无法解析")
-  }
   return subtitles
 }
 
@@ -232,6 +281,25 @@ function extractBvid(sourceInput: string): string | null {
   } catch {
     return null
   }
+}
+
+function resolveVideoPages(viewData: Record<string, unknown>): VideoPage[] {
+  const pages = Array.isArray(viewData.pages) ? viewData.pages : []
+  const resolvedPages = pages.flatMap((item, index) => {
+    const row = asRecord(item)
+    const cid = String(row.cid ?? "").trim()
+    if (!cid) return []
+    const page = normalizePositiveInteger(row.page, index + 1)
+    const part = String(row.part ?? row.title ?? `P${page}`).trim() || `P${page}`
+    return [{ cid, page, part }]
+  })
+
+  if (resolvedPages.length > 0) {
+    return resolvedPages.sort((a, b) => a.page - b.page)
+  }
+
+  const cid = String(viewData.cid ?? "").trim()
+  return cid ? [{ cid, page: 1, part: "P1" }] : []
 }
 
 function selectSubtitleTracks(payload: unknown[], preferredLanguage?: string | null): SubtitleTrack[] {
@@ -419,6 +487,12 @@ function mapQrPollStatus(code: number): QrPollStatus {
 
 function roundMs(value: number): number {
   return Math.round((Number.isFinite(value) ? value : 0) * 1000) / 1000
+}
+
+function normalizePositiveInteger(value: unknown, fallback: number): number {
+  const number = Number(value)
+  if (Number.isInteger(number) && number > 0) return number
+  return fallback
 }
 
 function pad(value: number): string {

@@ -50,12 +50,7 @@ export default function Home() {
         language,
       })
       const nextItems = payload.items.map((item, index) => {
-        const base = loadingItems[index] ?? {
-          id: crypto.randomUUID(),
-          bvid: item.source,
-          title: item.source,
-          status: "loading" as const,
-        }
+        const base = buildSubtitleItemBase(item, loadingItems[index])
         if (!item.ok) {
           return {
             ...base,
@@ -242,4 +237,29 @@ function toSubtitleVariants(item: SubtitleResult): SubtitleVariant[] {
     srt: subtitle.srt,
     rawJson: subtitle.raw_json,
   }))
+}
+
+function buildSubtitleItemBase(item: SubtitleResult, fallback?: SubtitleItem): SubtitleItem {
+  const bvid = item.bvid || item.source
+  const page = typeof item.page === "number" && item.page > 0 ? item.page : undefined
+  const title = formatSubtitleTitle(item)
+  return {
+    id: item.cid ? `${bvid}:${item.cid}` : fallback?.id ?? crypto.randomUUID(),
+    bvid,
+    cid: item.cid,
+    page,
+    part: item.part,
+    title: title || fallback?.title || item.source,
+    status: "loading",
+  }
+}
+
+function formatSubtitleTitle(item: SubtitleResult): string {
+  const title = (item.title || item.source || "").trim()
+  const part = (item.part || "").trim()
+  const page = typeof item.page === "number" && item.page > 0 ? item.page : undefined
+  if (!page && !part) return title
+  const prefix = page ? `P${page}` : "分P"
+  const suffix = part && part !== title ? ` · ${part}` : ""
+  return `${title} · ${prefix}${suffix}`
 }
