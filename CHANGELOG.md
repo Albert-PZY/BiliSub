@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/Albert-PZY/BiliSub/compare/v1.0.1...v1.1.0) (2026-06-07)
+
+
+### Features
+
+* stream subtitles for selected video parts ([1e7f364](https://github.com/Albert-PZY/BiliSub/commit/1e7f3646627a5da9240064775e922337b6056a01))
+* stream subtitles for selected video parts ([27c1633](https://github.com/Albert-PZY/BiliSub/commit/27c163362b96fa5000a3a1f1a9ab83a827160a12))
+
 ## [1.0.1](https://github.com/Albert-PZY/BiliSub/compare/v1.0.0...v1.0.1) (2026-06-07)
 
 
