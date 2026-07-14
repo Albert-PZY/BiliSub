@@ -9,98 +9,76 @@
     <img alt="pnpm" src="https://img.shields.io/badge/pnpm-11-F69220?logo=pnpm&logoColor=white" />
   </p>
 
-  <p><strong>扫码登录 B 站，获取官方 AI 字幕，在线校对后导出。</strong></p>
+  <p><strong>批量获取 B 站官方 AI 字幕，边获取、边校对、边交付。</strong></p>
+  <p>
+    <a href="https://bili-sub.vercel.app">在线使用</a>
+    ·
+    <a href="#本地运行">本地运行</a>
+    ·
+    <a href="#部署">部署</a>
+  </p>
 </div>
 
-## 这是什么？
+## 项目简介
 
-BiliAISub 是一个 Next.js 全栈 TypeScript 应用，围绕“字幕工作流”而不是单次接口请求设计：从登录、解析、获取到编辑和导出，每一步都能看到当前状态，字幕按分 P 流式返回，先拿到的内容先进入编辑器。
+BiliAISub 是一个面向完整字幕工作流的 Next.js 全栈应用。输入 BV 号、视频链接或 `b23.tv` 短链接后，它会解析视频与分 P，以 NDJSON 流逐条返回可用字幕，并提供多语言校对、原文恢复和批量导出。
 
-### 适合做什么
+应用使用服务端加密会话访问 B 站字幕接口。`SESSDATA` 等登录凭据只存在于加密的 HttpOnly Cookie 中，不会交给浏览器 JavaScript。
 
-| 能力 | 说明 |
+## 功能一览
+
+| 能力 | 行为 |
 | --- | --- |
-| 批量解析 | 支持 BV 号、B 站视频链接和 `b23.tv` 短链接；单次最多 20 个输入，自动去重 |
-| 分 P 选择 | 多分 P 视频可搜索、全选或清空，再按需获取字幕 |
-| 流式字幕 | 服务端以 NDJSON 逐条推送结果，成功、无字幕、失败分别展示 |
-| 多语言编辑 | 一次获取全部语言或指定语言，语言标签会保留当前页编辑状态 |
-| 本页自动保存 | 修改立即保存在当前页面，切换视频或语言不会丢失；可随时恢复原文 |
-| 灵活导出 | 当前语言、当前视频、全部成功字幕，均可导出 TXT / SRT / JSON |
+| 批量解析 | 单次处理最多 20 个输入，支持 BV 号、完整链接和 B 站短链接，并自动去重 |
+| 分 P 处理 | 多分 P 视频支持搜索、全选、清空和按需获取 |
+| 流式反馈 | 每完成一个分 P 就立即更新界面，无需等待整批任务结束 |
+| 多语言校对 | 获取全部语言或指定语言，切换视频与语言时保留页面内编辑内容 |
+| 失败隔离 | 单条语言轨道失败不会拖垮同一视频的其他可用字幕 |
+| 分级导出 | 按当前语言、当前视频或全部成功结果导出 TXT、SRT、JSON |
 
-## 工作流
+## 字幕处理工作流
 
-```mermaid
-flowchart LR
-  Login[扫码登录] --> Resolve[解析视频与分P]
-  Resolve --> Select{是否多分P?}
-  Select -->|是| Pages[搜索并选择分P]
-  Select -->|否| Fetch[流式获取字幕]
-  Pages --> Fetch
-  Fetch --> Edit[按语言校对]
-  Edit --> Export[TXT / SRT / JSON]
-```
+<div align="center">
+  <img src="public/diagrams/workflow.svg" alt="BiliAISub 字幕处理工作流：登录、解析分P、流式获取、校对与导出" width="520" />
+</div>
 
-## 架构设计
+<p align="center"><sub>PlantUML 源文件：<a href="docs/diagrams/workflow.puml">docs/diagrams/workflow.puml</a></sub></p>
 
-```mermaid
-flowchart TB
-  Browser[浏览器]
+## 全栈架构
 
-  subgraph Client[客户端]
-    Page[app/page.tsx]
-    Workspace[hooks/use-subtitle-workspace.ts]
-    Components[components/*]
-    LocalApi[lib/local-api.ts]
-    Model[lib/subtitles.ts]
-  end
+<div align="center">
+  <img src="public/diagrams/architecture.svg" alt="BiliAISub 全栈架构：浏览器、Next.js 服务端和 Bilibili 接口" width="860" />
+</div>
 
-  subgraph Server[Next.js Node.js Runtime]
-    AuthApi[app/api/auth/*]
-    ResolveApi[app/api/videos/resolve]
-    SubtitleApi[app/api/subtitles\nNDJSON 流]
-    Session[加密 HttpOnly Cookie]
-    BiliClient[lib/server/bilibili.ts]
-  end
+<p align="center"><sub>PlantUML 源文件：<a href="docs/diagrams/architecture.puml">docs/diagrams/architecture.puml</a></sub></p>
 
-  Bilibili[Bilibili 登录 / 视频 / AI 字幕接口]
+### 设计要点
 
-  Browser --> Page
-  Page --> Workspace
-  Workspace --> Components
-  Workspace --> LocalApi
-  Workspace --> Model
-  LocalApi --> AuthApi
-  LocalApi --> ResolveApi
-  LocalApi --> SubtitleApi
-  AuthApi <--> Session
-  AuthApi <--> BiliClient
-  ResolveApi --> BiliClient
-  SubtitleApi --> Session
-  SubtitleApi --> BiliClient
-  BiliClient <--> Bilibili
-```
+- **服务端会话**：B 站 Cookie 使用 AES-256-GCM 加密后写入 HttpOnly Cookie，前端只读取账号摘要。
+- **请求生命周期**：重新解析、退出登录或卸载页面时通过 `AbortController` 终止旧请求，防止过期结果覆盖新状态。
+- **输入边界**：视频输入和字幕分 P 均有去重与数量上限；视频信息以最多 4 个并发请求解析。
+- **渐进式结果**：服务端按分 P 处理字幕，客户端消费 NDJSON 流并即时更新任务状态。
+- **原始数据保护**：TXT 使用页面编辑内容；SRT 与 JSON 保留 B 站返回的原始时间轴和数据结构。
 
-### 关键设计取舍
+## 本地运行
 
-- 登录 Cookie 只在服务端读取，浏览器 JavaScript 只能得到账号摘要，不会接触 `SESSDATA` 等凭据。
-- 字幕请求按分 P 顺序流式处理，并对同一分 P 的多语言轨道允许部分成功，避免一个语言失败拖垮全部结果。
-- 前端请求支持 `AbortController`；重新解析、退出登录和卸载页面时会终止旧任务，避免过期响应覆盖新状态。
-- API 对批量输入做去重和数量上限控制，视频解析并发限制为 4，字幕分 P 上限为 100。
+### 环境要求
 
-## 本地启动
+- Node.js 22
+- pnpm 11
+
+### 启动开发环境
 
 ```powershell
 pnpm install
 pnpm dev
 ```
 
-打开 <http://localhost:3000>。
+访问 <http://localhost:3000>。
 
-生产环境建议使用 Node.js 22 和 pnpm 11。
+### 生产环境变量
 
-## 环境变量
-
-生产环境必须设置一串足够长的随机密钥：
+公开部署必须配置强随机密钥：
 
 ```text
 BILI_SUB_SESSION_SECRET=一串足够长的随机字符串
@@ -112,55 +90,67 @@ BILI_SUB_SESSION_SECRET=一串足够长的随机字符串
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-本地开发未设置时会使用仅供开发的默认值；不要将该默认值用于公开部署。
+本地开发未配置时会使用仅供开发的默认值，该默认值不能用于生产环境。
+
+## 常用命令
+
+| 命令 | 用途 |
+| --- | --- |
+| `pnpm dev` | 启动本地开发服务器 |
+| `pnpm typecheck` | 生成 Next.js 路由类型并执行 TypeScript 检查 |
+| `pnpm build` | 创建生产构建 |
+| `pnpm start` | 运行已生成的生产构建 |
+
+<details>
+<summary>重新渲染 PlantUML 图表</summary>
+
+下载 `plantuml.jar` 后，在项目根目录运行：
+
+```powershell
+java "-Djava.awt.headless=true" -jar plantuml.jar -charset UTF-8 -tsvg -o "../../public/diagrams" "docs/diagrams/workflow.puml" "docs/diagrams/architecture.puml"
+```
+
+当前 SVG 使用 PlantUML 1.2026.6 生成。
+
+</details>
 
 ## 项目结构
 
 ```text
 app/
-  api/auth/                    扫码登录、状态检查、退出登录
-  api/videos/resolve/          解析 BV / 视频链接 / 分P
-  api/subtitles/               按分P流式返回字幕
+  api/auth/                    扫码登录、状态检查和退出登录
+  api/videos/resolve/          解析 BV、视频信息与分 P
+  api/subtitles/               按分 P 流式返回字幕
   page.tsx                     工作台页面与交互编排
-components/                   登录、输入、分P、编辑器、导出等 UI
+components/                   登录、输入、分 P、编辑器和导出 UI
 hooks/
   use-subtitle-workspace.ts    请求生命周期与工作区状态
 lib/
-  local-api.ts                 前端 API 类型、取消和 NDJSON 读取
+  local-api.ts                 客户端 API、取消和 NDJSON 读取
   limits.ts                    前后端共享的批量处理上限
   subtitles.ts                 字幕模型与纯函数
-  server/bilibili.ts           B站接口、字幕解析、SRT 渲染
+  server/bilibili.ts           B 站接口、字幕解析和 SRT 渲染
   server/request.ts            输入边界与并发控制
-  server/session.ts             加密 HttpOnly Cookie 会话
-public/readme-hero.svg         README 工作台视觉说明
+  server/session.ts            加密 HttpOnly Cookie 会话
+docs/diagrams/                PlantUML 图表源文件
+public/diagrams/              README 使用的已渲染 SVG
+public/readme-hero.svg         README 头图
 ```
 
-## 常用命令
+## 部署
 
-```powershell
-pnpm typecheck
-pnpm build
-pnpm dev
-```
-
-## 部署到 Vercel
+项目依赖 Next.js Node.js Runtime，推荐部署到 Vercel：
 
 1. 在 Vercel 导入 GitHub 仓库 `Albert-PZY/BiliSub`。
-2. Framework 选择 `Next.js`，Root Directory 保持项目根目录。
+2. Framework 保持 `Next.js`，Root Directory 保持仓库根目录。
 3. Install Command 使用 `pnpm install --frozen-lockfile`。
 4. Build Command 使用 `pnpm build`。
-5. 添加环境变量 `BILI_SUB_SESSION_SECRET` 后再部署。
+5. 添加 `BILI_SUB_SESSION_SECRET` 后部署。
 
-项目已经包含 `vercel.json`，完整功能需要支持 Next.js Node.js 服务端运行时的平台。
+仓库已包含 `vercel.json`。GitHub Pages 只能托管静态文件，无法运行本项目的登录、会话和字幕 API Routes。
 
-## 导出说明
+## 使用边界
 
-- TXT：使用当前页面中的编辑内容，适合整理成笔记或文稿。
-- SRT：保留 B 站返回的原始时间轴和文本，不会把 TXT 的润色同步回时间轴。
-- JSON：保留 B 站原始字幕结构，便于后续程序处理。
-
-## 注意事项
-
-- 字幕内容来自 B 站官方 AI 字幕，具体视频是否有字幕取决于 B 站返回结果。
-- 请遵守 B 站服务条款与内容版权要求，仅处理你有权访问和使用的视频。
+- 字幕是否可用取决于 B 站对具体视频返回的官方 AI 字幕。
+- 请遵守 B 站服务条款和内容版权要求，仅处理你有权访问与使用的视频。
 - 提交信息遵循约定式提交，详见 [`docs/git-commit-guidelines.md`](docs/git-commit-guidelines.md)。

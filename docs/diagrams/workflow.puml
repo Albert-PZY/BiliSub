@@ -1,0 +1,48 @@
+@startuml
+!pragma layout smetana
+title BiliAISub 字幕处理工作流
+
+skinparam backgroundColor #F8FBFF
+skinparam defaultFontName Microsoft YaHei
+skinparam defaultFontColor #24364B
+skinparam titleFontSize 22
+skinparam titleFontColor #173B61
+skinparam shadowing false
+skinparam roundcorner 18
+skinparam ArrowColor #368BC1
+skinparam ArrowThickness 1.4
+skinparam activity {
+  BackgroundColor #FFFFFF
+  BorderColor #79BFE7
+  FontColor #24364B
+  DiamondBackgroundColor #E8F6FF
+  DiamondBorderColor #368BC1
+  StartColor #1AA7E1
+  EndColor #F06C9F
+}
+
+start
+:1  扫码登录\n建立服务端加密会话;
+:2  添加视频\nBV 号 / 完整链接 / 短链接;
+:3  解析视频标题与分 P;
+
+if (包含多分 P？) then (是)
+  :搜索并选择处理范围;
+else (否)
+  :自动选中当前视频;
+endif
+
+:4  创建字幕任务\n确定语言与处理范围;
+repeat
+  :获取一个分 P 的可用字幕轨道;
+  :通过 NDJSON 推送结果\n并立即更新任务列表;
+repeat while (还有待处理分 P？) is (是) not (否)
+
+:5  在线校对\n切换语言 / 恢复原文;
+:6  按范围导出\nTXT / SRT / JSON;
+stop
+
+legend bottom
+  一个分 P 完成后立即反馈，无需等待整批任务结束
+endlegend
+@enduml
