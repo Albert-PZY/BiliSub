@@ -4,31 +4,32 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(0.99 0 0);
-  --foreground: oklch(0.15 0 0);
+  --background: oklch(0.985 0.006 240);
+  --foreground: oklch(0.22 0.025 250);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.15 0 0);
+  --card-foreground: oklch(0.22 0.025 250);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.15 0 0);
-  --primary: oklch(0.15 0 0);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.96 0 0);
-  --secondary-foreground: oklch(0.15 0 0);
-  --muted: oklch(0.96 0 0);
-  --muted-foreground: oklch(0.5 0 0);
-  --accent: oklch(0.55 0.15 160);
-  --accent-foreground: oklch(0.99 0 0);
+  --popover-foreground: oklch(0.22 0.025 250);
+  --primary: oklch(0.62 0.17 238);
+  --primary-foreground: oklch(0.99 0.005 240);
+  --secondary: oklch(0.955 0.018 242);
+  --secondary-foreground: oklch(0.29 0.04 248);
+  --muted: oklch(0.955 0.012 245);
+  --muted-foreground: oklch(0.52 0.025 248);
+  --accent: oklch(0.94 0.035 240);
+  --accent-foreground: oklch(0.35 0.1 240);
+  --brand-pink: oklch(0.67 0.2 8);
   --destructive: oklch(0.55 0.2 25);
   --destructive-foreground: oklch(0.99 0 0);
-  --border: oklch(0.9 0 0);
-  --input: oklch(0.96 0 0);
-  --ring: oklch(0.55 0.15 160);
+  --border: oklch(0.9 0.018 245);
+  --input: oklch(0.965 0.01 245);
+  --ring: oklch(0.62 0.17 238);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 0.5rem;
+  --radius: 0.75rem;
   --sidebar: oklch(0.98 0 0);
   --sidebar-foreground: oklch(0.15 0 0);
   --sidebar-primary: oklch(0.15 0 0);
@@ -40,25 +41,26 @@
 }
 
 .dark {
-  --background: oklch(0.09 0 0);
-  --foreground: oklch(0.95 0 0);
-  --card: oklch(0.12 0 0);
-  --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.12 0 0);
-  --popover-foreground: oklch(0.95 0 0);
-  --primary: oklch(0.95 0 0);
-  --primary-foreground: oklch(0.09 0 0);
-  --secondary: oklch(0.18 0 0);
-  --secondary-foreground: oklch(0.95 0 0);
-  --muted: oklch(0.18 0 0);
-  --muted-foreground: oklch(0.6 0 0);
-  --accent: oklch(0.75 0.15 160);
-  --accent-foreground: oklch(0.09 0 0);
+  --background: oklch(0.145 0.02 252);
+  --foreground: oklch(0.94 0.012 244);
+  --card: oklch(0.185 0.022 252);
+  --card-foreground: oklch(0.94 0.012 244);
+  --popover: oklch(0.19 0.022 252);
+  --popover-foreground: oklch(0.94 0.012 244);
+  --primary: oklch(0.72 0.15 235);
+  --primary-foreground: oklch(0.15 0.025 252);
+  --secondary: oklch(0.235 0.025 250);
+  --secondary-foreground: oklch(0.92 0.012 244);
+  --muted: oklch(0.235 0.022 250);
+  --muted-foreground: oklch(0.68 0.025 246);
+  --accent: oklch(0.26 0.055 240);
+  --accent-foreground: oklch(0.9 0.04 235);
+  --brand-pink: oklch(0.74 0.18 8);
   --destructive: oklch(0.55 0.2 25);
   --destructive-foreground: oklch(0.95 0 0);
-  --border: oklch(0.22 0 0);
-  --input: oklch(0.15 0 0);
-  --ring: oklch(0.75 0.15 160);
+  --border: oklch(0.29 0.025 250);
+  --input: oklch(0.21 0.022 250);
+  --ring: oklch(0.72 0.15 235);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -91,6 +93,7 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-brand-pink: var(--brand-pink);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
@@ -119,7 +122,32 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    scroll-behavior: smooth;
+  }
   body {
     @apply bg-background text-foreground;
+    min-width: 320px;
+    background-image:
+      linear-gradient(to right, color-mix(in oklab, var(--border) 20%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklab, var(--border) 16%, transparent) 1px, transparent 1px);
+    background-size: 32px 32px;
+    background-attachment: fixed;
+  }
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']) {
+    cursor: pointer;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 24%, transparent);
+  }
+}
+
+@layer utilities {
+  .brand-gradient-text {
+    background: linear-gradient(110deg, var(--primary), var(--brand-pink));
+    background-clip: text;
+    color: transparent;
+    -webkit-background-clip: text;
   }
 }
