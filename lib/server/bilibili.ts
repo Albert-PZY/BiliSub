@@ -68,7 +68,8 @@ type SubtitleSegment = {
 const COOKIE_WHITELIST = ["SESSDATA", "bili_jct", "DedeUserID", "DedeUserID__ckMd5", "sid"]
 const BV_PATTERN = /\b(BV[0-9A-Za-z]{10})\b/
 const VIDEO_PATH_PATTERN = /\/video\/(BV[0-9A-Za-z]{10})/
-const AUTH_EXPIRED_PATTERN = /未登录|登录态|权限|SESSDATA/
+const SHORT_LINK_HOSTS = new Set(["b23.tv", "www.b23.tv"])
+const AUTH_EXPIRED_PATTERN = /未登录|登录态.{0,8}失效|SESSDATA/i
 const DEFAULT_HEADERS = {
   Accept: "application/json, text/plain, */*",
   "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
@@ -108,7 +109,7 @@ export async function pollQrLogin(qrcodeKey: string): Promise<QrPollResult> {
     throw new BilibiliError("qrcode_key 不能为空")
   }
 
-  const response = await fetch(
+  const response = await fetchBilibili(
     `https://passport.bilibili.com/x/passport-login/web/qrcode/poll?${new URLSearchParams({
       qrcode_key: qrcodeKey.trim(),
       source: "main-fe-header",
@@ -116,7 +117,6 @@ export async function pollQrLogin(qrcodeKey: string): Promise<QrPollResult> {
     {
       headers: DEFAULT_HEADERS,
       cache: "no-store",
-      signal: AbortSignal.timeout(20_000),
     },
   )
   const payload = await parseJsonResponse(response)
@@ -153,20 +153,22 @@ export async function pollQrLogin(qrcodeKey: string): Promise<QrPollResult> {
   }
 }
 
-export async function fetchAccountSummary(cookies: Record<string, string>): Promise<Account | null> {
-  const response = await fetch("https://api.bilibili.com/x/web-interface/nav", {
+export async function fetchAccountSummary(cookies: Record<string, string>): Promise<Account> {
+  const response = await fetchBilibili("https://api.bilibili.com/x/web-interface/nav", {
     headers: buildRequestHeaders(buildCookieHeader(cookies)),
     cache: "no-store",
-    signal: AbortSignal.timeout(20_000),
   })
   const payload = await parseJsonResponse(response)
   if (looksLikeExpiredAuth(response.status, payload)) {
     throw new BilibiliError("当前登录态已失效")
   }
+  assertSuccessfulApiResponse(response, payload, "读取 B 站账号信息失败")
   const data = asRecord(payload.data)
   const mid = String(data.mid ?? "").trim()
   const uname = String(data.uname ?? "").trim()
-  if (!mid || !uname) return null
+  if (!mid || !uname) {
+    throw new BilibiliError("B 站账号信息不完整，请重新扫码登录")
+  }
   return { mid, uname }
 }
 
@@ -186,7 +188,7 @@ export async function fetchAiSubtitles(
 }
 
 export async function resolveVideo(sourceInput: string): Promise<ResolvedVideo> {
-  const bvid = extractBvid(sourceInput)
+  const bvid = extractBvid(sourceInput) ?? await resolveShortLinkBvid(sourceInput)
   if (!bvid) {
     throw new BilibiliError("无法从输入中解析 BV 号")
   }
@@ -238,18 +240,18 @@ async function fetchPageAiSubtitles(
   cookieHeader: string,
   preferredLanguage?: string | null,
 ): Promise<ResolvedSubtitle[]> {
-  const playerResponse = await fetch(
+  const playerResponse = await fetchBilibili(
     `https://api.bilibili.com/x/player/wbi/v2?${new URLSearchParams({ aid, cid })}`,
     {
       headers: buildRequestHeaders(cookieHeader),
       cache: "no-store",
-      signal: AbortSignal.timeout(20_000),
     },
   )
   const playerPayload = await parseJsonResponse(playerResponse)
   if (looksLikeExpiredAuth(playerResponse.status, playerPayload)) {
     throw new BilibiliError("Bilibili 登录态已失效，请重新扫码登录")
   }
+  assertSuccessfulApiResponse(playerResponse, playerPayload, "读取字幕列表失败")
 
   const subtitleData = asRecord(asRecord(playerPayload.data).subtitle)
   const rawTracks = Array.isArray(subtitleData.subtitles) ? subtitleData.subtitles : []
@@ -258,12 +260,10 @@ async function fetchPageAiSubtitles(
     return []
   }
 
-  const subtitles: ResolvedSubtitle[] = []
-  for (const track of tracks) {
-    const subtitleResponse = await fetch(track.subtitle_url, {
+  const results = await Promise.allSettled(tracks.map(async (track): Promise<ResolvedSubtitle | null> => {
+    const subtitleResponse = await fetchBilibili(track.subtitle_url, {
       headers: buildRequestHeaders(cookieHeader),
       cache: "no-store",
-      signal: AbortSignal.timeout(20_000),
     })
     const rawJson = await subtitleResponse.text()
     let subtitlePayload: Record<string, unknown> | null = null
@@ -275,17 +275,38 @@ async function fetchPageAiSubtitles(
     if (looksLikeExpiredAuth(subtitleResponse.status, subtitlePayload)) {
       throw new BilibiliError("Bilibili 登录态已失效，请重新扫码登录")
     }
+    if (!subtitleResponse.ok) {
+      throw new BilibiliError(`下载${track.label || track.language}字幕失败（HTTP ${subtitleResponse.status}）`)
+    }
 
     const segments = parseSubtitleSegments(rawJson)
-    if (segments.length === 0) continue
-    subtitles.push({
+    if (segments.length === 0) return null
+    return {
       language: track.language,
       label: track.label || track.language,
       raw_json: rawJson,
       srt: renderSrt(segments),
       subtitle_url: track.subtitle_url,
       text: buildTranscriptText(segments),
-    })
+    }
+  }))
+
+  const authError = results.find(
+    (result): result is PromiseRejectedResult =>
+      result.status === "rejected" &&
+      result.reason instanceof BilibiliError &&
+      AUTH_EXPIRED_PATTERN.test(result.reason.message),
+  )
+  if (authError) throw authError.reason
+
+  const subtitles = results.flatMap((result) =>
+    result.status === "fulfilled" && result.value ? [result.value] : [],
+  )
+  if (subtitles.length === 0) {
+    const firstError = results.find((result): result is PromiseRejectedResult => result.status === "rejected")
+    if (firstError) {
+      throw firstError.reason instanceof Error ? firstError.reason : new BilibiliError("下载字幕失败")
+    }
   }
 
   return subtitles
@@ -303,6 +324,25 @@ function extractBvid(sourceInput: string): string | null {
   } catch {
     return null
   }
+}
+
+async function resolveShortLinkBvid(sourceInput: string): Promise<string | null> {
+  let url: URL
+  try {
+    url = new URL(String(sourceInput ?? "").trim())
+  } catch {
+    return null
+  }
+  if (!SHORT_LINK_HOSTS.has(url.hostname.toLowerCase())) return null
+
+  const response = await fetchBilibili(url.toString(), {
+    headers: DEFAULT_HEADERS,
+    cache: "no-store",
+    redirect: "follow",
+  })
+  const bvid = extractBvid(response.url)
+  await response.body?.cancel()
+  return bvid
 }
 
 function resolveVideoPages(viewData: Record<string, unknown>): VideoPage[] {
@@ -339,7 +379,8 @@ function selectSubtitleTracks(payload: unknown[], preferredLanguage?: string | n
     ]
   })
 
-  const sortedTracks = tracks.sort((a, b) => {
+  const uniqueTracks = [...new Map(tracks.map((track) => [`${track.language}:${track.subtitle_url}`, track])).values()]
+  const sortedTracks = uniqueTracks.sort((a, b) => {
     const rankDiff = rankLanguage(a.language, preferredLanguage) - rankLanguage(b.language, preferredLanguage)
     return rankDiff || a.language.localeCompare(b.language)
   })
@@ -394,21 +435,47 @@ function renderSrt(segments: SubtitleSegment[]): string {
 }
 
 async function requestJson(url: string): Promise<Record<string, unknown>> {
-  const response = await fetch(url, {
+  const response = await fetchBilibili(url, {
     headers: DEFAULT_HEADERS,
     cache: "no-store",
-    signal: AbortSignal.timeout(20_000),
   })
-  return parseJsonResponse(response)
+  const payload = await parseJsonResponse(response)
+  assertSuccessfulApiResponse(response, payload, "B 站接口请求失败")
+  return payload
 }
 
 async function parseJsonResponse(response: Response): Promise<Record<string, unknown>> {
   const text = await response.text()
   try {
     return JSON.parse(text) as Record<string, unknown>
-  } catch (error) {
-    throw new BilibiliError(`返回了无法解析的响应: ${text.slice(0, 120)}`)
+  } catch {
+    throw new BilibiliError(`B 站接口返回了无法解析的响应（HTTP ${response.status}）`)
   }
+}
+
+async function fetchBilibili(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: init.signal ?? AbortSignal.timeout(20_000),
+    })
+  } catch (error) {
+    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+      throw new BilibiliError("B 站接口请求超时，请稍后重试")
+    }
+    throw new BilibiliError("暂时无法连接 B 站接口，请稍后重试")
+  }
+}
+
+function assertSuccessfulApiResponse(
+  response: Response,
+  payload: Record<string, unknown>,
+  fallbackMessage: string,
+): void {
+  const code = Number(payload.code ?? 0)
+  if (response.ok && code === 0) return
+  const message = String(payload.message ?? payload.msg ?? "").trim()
+  throw new BilibiliError(message ? `${fallbackMessage}：${message}` : `${fallbackMessage}（HTTP ${response.status}）`)
 }
 
 function buildRequestHeaders(cookieHeader: string): Record<string, string> {
@@ -471,7 +538,7 @@ function rankLanguage(value: string, preferredLanguage?: string | null): number 
 }
 
 function looksLikeExpiredAuth(statusCode: number, payload: Record<string, unknown> | null): boolean {
-  if (statusCode === 401 || statusCode === 403) return true
+  if (statusCode === 401) return true
   if (!payload) return false
   const code = Number(payload.code ?? 0)
   const message = String(payload.message ?? payload.msg ?? "").trim()

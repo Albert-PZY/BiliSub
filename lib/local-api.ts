@@ -3,6 +3,13 @@ export type Account = {
   uname: string
 }
 
+export type VideoSource = {
+  id: string
+  url: string
+}
+
+export type SubtitleLanguageMode = "all" | "zh-Hans" | "zh-Hant" | "en" | "ja" | "ko"
+
 export type SessionStatus = {
   status: "missing" | "active" | "expired"
   account: Account | null
@@ -67,20 +74,27 @@ export type SubtitleStreamEvent =
   | { type: "error"; item: SubtitleResult }
   | { type: "done" }
 
+type RequestOptions = {
+  signal?: AbortSignal
+}
+
 export function buildVideoPageId(page: Pick<ResolvedVideoPageResult, "bvid" | "cid">): string {
   return `${page.bvid}:${page.cid}`
 }
 
-export async function postJson<T>(path: string, payload: unknown = {}): Promise<T> {
+export async function postJson<T>(path: string, payload: unknown = {}, options: RequestOptions = {}): Promise<T> {
   const response = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+    signal: options.signal,
   })
-  const data = await response.json()
+  const text = await response.text()
+  const data = parseJson(text)
   if (!response.ok) {
-    throw new Error(data.error || `请求失败：${response.status}`)
+    throw new ApiError(readErrorMessage(data, text, response.status), response.status)
   }
+  if (data === null) return undefined as T
   return data as T
 }
 
@@ -88,6 +102,7 @@ export async function streamPostJson<TEvent>(
   path: string,
   payload: unknown,
   onEvent: (event: TEvent) => void,
+  options: RequestOptions = {},
 ): Promise<void> {
   const response = await fetch(path, {
     method: "POST",
@@ -96,18 +111,12 @@ export async function streamPostJson<TEvent>(
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
+    signal: options.signal,
   })
 
   if (!response.ok) {
     const text = await response.text()
-    let message = text || `请求失败：${response.status}`
-    try {
-      const data = JSON.parse(text) as { error?: string }
-      message = data.error || message
-    } catch {
-      // Keep the raw response text as the error message.
-    }
-    throw new Error(message)
+    throw new ApiError(readErrorMessage(parseJson(text), text, response.status), response.status)
   }
 
   if (!response.body) {
@@ -128,13 +137,54 @@ export async function streamPostJson<TEvent>(
     for (const line of lines) {
       const trimmed = line.trim()
       if (!trimmed) continue
-      onEvent(JSON.parse(trimmed) as TEvent)
+      onEvent(parseStreamEvent<TEvent>(trimmed))
     }
   }
 
   buffer += decoder.decode()
   const trimmed = buffer.trim()
   if (trimmed) {
-    onEvent(JSON.parse(trimmed) as TEvent)
+    onEvent(parseStreamEvent<TEvent>(trimmed))
+  }
+}
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message)
+    this.name = "ApiError"
+  }
+}
+
+export function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException
+    ? error.name === "AbortError"
+    : error instanceof Error && error.name === "AbortError"
+}
+
+function parseJson(text: string): unknown {
+  if (!text.trim()) return null
+  try {
+    return JSON.parse(text) as unknown
+  } catch {
+    return null
+  }
+}
+
+function readErrorMessage(data: unknown, rawText: string, status: number): string {
+  if (data && typeof data === "object" && "error" in data) {
+    const error = String((data as { error?: unknown }).error ?? "").trim()
+    if (error) return error
+  }
+  return rawText.trim() || `请求失败：${status}`
+}
+
+function parseStreamEvent<TEvent>(line: string): TEvent {
+  try {
+    return JSON.parse(line) as TEvent
+  } catch {
+    throw new Error("服务端返回了无法解析的流式数据")
   }
 }

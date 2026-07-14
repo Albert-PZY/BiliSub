@@ -6,6 +6,12 @@ import {
   type ResolvedVideoPage,
 } from "@/lib/server/bilibili"
 import { readSession } from "@/lib/server/session"
+import {
+  exceedsArrayLimit,
+  MAX_SUBTITLE_PAGES,
+  MAX_VIDEO_SOURCES,
+  normalizeStringList,
+} from "@/lib/server/request"
 
 export const runtime = "nodejs"
 
@@ -46,9 +52,26 @@ export async function POST(request: NextRequest) {
   }
 
   const payload = (await request.json().catch(() => ({}))) as SubtitlesPayload
-  const language = String(payload.language ?? "all").trim()
+  if (
+    exceedsArrayLimit(payload.pages, MAX_SUBTITLE_PAGES) ||
+    exceedsArrayLimit(payload.sources, MAX_VIDEO_SOURCES)
+  ) {
+    return NextResponse.json({ error: "请求中的视频或分 P 数量超过限制" }, { status: 400 })
+  }
+  const language = String(payload.language ?? "all").trim().slice(0, 32)
   const preferredLanguage = ["", "all", "__all__"].includes(language.toLowerCase()) ? null : language
-  const pages = await resolveRequestedPages(payload)
+  let pages: ResolvedVideoPage[]
+  try {
+    pages = await resolveRequestedPages(payload)
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "解析字幕请求失败" },
+      { status: error instanceof BilibiliError ? 422 : 500 },
+    )
+  }
+  if (pages.length === 0) {
+    return NextResponse.json({ error: "没有可获取字幕的视频分 P" }, { status: 400 })
+  }
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -119,15 +142,16 @@ export async function POST(request: NextRequest) {
 
 async function resolveRequestedPages(payload: SubtitlesPayload): Promise<ResolvedVideoPage[]> {
   const pages = (payload.pages ?? []).flatMap(parseResolvedVideoPage)
-  if (pages.length > 0) return pages
+  const uniquePages = uniqueBy(pages, (page) => `${page.bvid}:${page.cid}`).slice(0, MAX_SUBTITLE_PAGES)
+  if (uniquePages.length > 0) return uniquePages
 
-  const sources = (payload.sources ?? []).map((item) => String(item).trim()).filter(Boolean)
+  const sources = normalizeStringList(payload.sources, MAX_VIDEO_SOURCES)
   const resolved: ResolvedVideoPage[] = []
   for (const source of sources) {
     const video = await resolveVideo(source)
     resolved.push(...video.pages)
   }
-  return resolved
+  return uniqueBy(resolved, (page) => `${page.bvid}:${page.cid}`).slice(0, MAX_SUBTITLE_PAGES)
 }
 
 function parseResolvedVideoPage(item: unknown): ResolvedVideoPage[] {
@@ -140,6 +164,35 @@ function parseResolvedVideoPage(item: unknown): ResolvedVideoPage[] {
   const page = Number(row.page ?? 0)
   const title = String(row.title ?? bvid).trim() || bvid
   const part = String(row.part ?? `P${page || 1}`).trim() || `P${page || 1}`
-  if (!source || !bvid || !aid || !cid || !Number.isInteger(page) || page <= 0) return []
-  return [{ source, bvid, aid, cid, page, title, part }]
+  if (
+    !source ||
+    !/^BV[0-9A-Za-z]{10}$/.test(bvid) ||
+    !/^\d+$/.test(aid) ||
+    !/^\d+$/.test(cid) ||
+    !Number.isInteger(page) ||
+    page <= 0
+  ) {
+    return []
+  }
+  return [
+    {
+      source: source.slice(0, 2_000),
+      bvid: bvid.slice(0, 32),
+      aid: aid.slice(0, 32),
+      cid: cid.slice(0, 32),
+      page,
+      title: title.slice(0, 300),
+      part: part.slice(0, 300),
+    },
+  ]
+}
+
+function uniqueBy<T>(items: T[], getKey: (item: T) => string): T[] {
+  const seen = new Set<string>()
+  return items.filter((item) => {
+    const key = getKey(item)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }

@@ -1,218 +1,65 @@
 "use client"
 
-import { useState } from "react"
-import { Github } from "lucide-react"
+import { useCallback, useState, type ReactNode } from "react"
+import {
+  Check,
+  FilePenLine,
+  Github,
+  Languages,
+  Loader2,
+  LockKeyhole,
+  Sparkles,
+  WandSparkles,
+  Zap,
+} from "lucide-react"
 import { DownloadPanel } from "@/components/download-panel"
 import { QrLogin } from "@/components/qr-login"
 import { SubtitleEditor } from "@/components/subtitle-editor"
-import { SubtitleItem, SubtitleList, type SubtitleVariant } from "@/components/subtitle-list"
+import { SubtitleList } from "@/components/subtitle-list"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
-import { VideoInput, type SubtitleLanguageMode, type VideoSource } from "@/components/video-input"
+import { VideoInput } from "@/components/video-input"
 import { VideoPageSelector } from "@/components/video-page-selector"
-import {
-  buildVideoPageId,
-  postJson,
-  streamPostJson,
-  type ResolvedVideoPageResult,
-  type ResolvedVideoResult,
-  type SubtitleResult,
-  type SubtitleStreamEvent,
-} from "@/lib/local-api"
+import { useSubtitleWorkspace } from "@/hooks/use-subtitle-workspace"
 
 const GITHUB_REPOSITORY_URL = "https://github.com/Albert-PZY/BiliSub"
 
 export default function Home() {
+  const workspace = useSubtitleWorkspace()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [subtitles, setSubtitles] = useState<SubtitleItem[]>([])
-  const [selectedSubtitle, setSelectedSubtitle] = useState<SubtitleItem | null>(null)
-  const [selectedLanguage, setSelectedLanguage] = useState("")
-  const [editedContent, setEditedContent] = useState("")
-  const [resolvedVideos, setResolvedVideos] = useState<ResolvedVideoResult[]>([])
-  const [selectedPageIds, setSelectedPageIds] = useState<Set<string>>(new Set())
-  const [subtitleLanguage, setSubtitleLanguage] = useState<SubtitleLanguageMode>("all")
-  const [isResolving, setIsResolving] = useState(false)
-  const [isFetching, setIsFetching] = useState(false)
-  const selectedVariant = findVariant(selectedSubtitle, selectedLanguage)
+  const { resetWorkspace } = workspace
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     setIsLoggedIn(false)
-    setSubtitles([])
-    setResolvedVideos([])
-    setSelectedPageIds(new Set())
-    setSelectedSubtitle(null)
-    setSelectedLanguage("")
-    setEditedContent("")
-  }
+    resetWorkspace()
+  }, [resetWorkspace])
 
-  const handleResolveVideos = async (videos: VideoSource[], language: SubtitleLanguageMode) => {
-    setIsResolving(true)
-    setSubtitleLanguage(language)
-    setResolvedVideos([])
-    setSelectedPageIds(new Set())
-    setSubtitles([])
-    setSelectedSubtitle(null)
-    setSelectedLanguage("")
-    setEditedContent("")
-
-    let pagesToFetch: ResolvedVideoPageResult[] | null = null
-    let initialItems: SubtitleItem[] = []
-
-    try {
-      const payload = await postJson<{ items: ResolvedVideoResult[] }>("/api/videos/resolve", {
-        sources: videos.map((video) => video.url),
-      })
-      const items = payload.items
-      const pages = items.flatMap((item) => item.pages ?? [])
-      const resolveErrorItems = items.filter((item) => !item.ok).map(buildResolveErrorItem)
-      const hasMultiPartVideo = items.some((item) => (item.pages?.length ?? 0) > 1)
-      const defaultSelectedPages = hasMultiPartVideo
-        ? items.flatMap((item) => ((item.pages?.length ?? 0) === 1 ? item.pages ?? [] : []))
-        : pages
-
-      if (hasMultiPartVideo) {
-        setResolvedVideos(items)
-        setSelectedPageIds(new Set(defaultSelectedPages.map(buildVideoPageId)))
-      }
-
-      if (!hasMultiPartVideo && pages.length > 0) {
-        pagesToFetch = pages
-        initialItems = resolveErrorItems
-      }
-
-      if (pages.length === 0) {
-        setSubtitles(resolveErrorItems.length > 0 ? resolveErrorItems : items.map(buildResolveErrorItem))
-      } else if (hasMultiPartVideo && resolveErrorItems.length > 0) {
-        setSubtitles(resolveErrorItems)
-      }
-    } catch (error) {
-      setSubtitles(videos.map((video, index) => buildRequestErrorItem(video.url, index, error)))
-    } finally {
-      setIsResolving(false)
-    }
-
-    if (pagesToFetch) {
-      await fetchSubtitlesForPages(pagesToFetch, language, initialItems)
-    }
-  }
-
-  const fetchSubtitlesForPages = async (
-    pages: ResolvedVideoPageResult[],
-    language: SubtitleLanguageMode,
-    initialItems: SubtitleItem[] = [],
-  ) => {
-    const loadingItems = pages.map(buildLoadingItemFromPage)
-    let hasSelectedFirstSuccess = false
-
-    setIsFetching(true)
-    setSubtitles([...initialItems, ...loadingItems])
-    setSelectedSubtitle(null)
-    setSelectedLanguage("")
-    setEditedContent("")
-
-    try {
-      await streamPostJson<SubtitleStreamEvent>(
-        "/api/subtitles",
-        {
-          pages,
-          language,
-        },
-        (event) => {
-          if (event.type === "done") return
-          const nextItem = buildSubtitleItemFromResult(event.item)
-          setSubtitles((prev) => upsertSubtitleItem(prev, nextItem))
-
-          if (nextItem.status === "success" && !hasSelectedFirstSuccess) {
-            hasSelectedFirstSuccess = true
-            handleSelectSubtitle(nextItem)
-          }
-        },
-      )
-    } catch (error) {
-      setSubtitles((prev) =>
-        prev.map((item) =>
-          item.status === "loading"
-            ? {
-                ...item,
-                status: "error" as const,
-                error: error instanceof Error ? error.message : "获取失败",
-              }
-            : item,
-        ),
-      )
-    } finally {
-      setIsFetching(false)
-    }
-  }
-
-  const handleTogglePage = (page: ResolvedVideoPageResult) => {
-    const pageId = buildVideoPageId(page)
-    setSelectedPageIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(pageId)) {
-        next.delete(pageId)
-      } else {
-        next.add(pageId)
-      }
-      return next
-    })
-  }
-
-  const handleSelectAllPages = () => {
-    const pages = resolvedVideos.flatMap((video) => video.pages ?? [])
-    setSelectedPageIds(new Set(pages.map(buildVideoPageId)))
-  }
-
-  const handleClearSelectedPages = () => {
-    setSelectedPageIds(new Set())
-  }
-
-  const handleFetchSelectedPages = async () => {
-    const pages = resolvedVideos
-      .flatMap((video) => video.pages ?? [])
-      .filter((page) => selectedPageIds.has(buildVideoPageId(page)))
-    const resolveErrorItems = resolvedVideos.filter((item) => !item.ok).map(buildResolveErrorItem)
-    await fetchSubtitlesForPages(pages, subtitleLanguage, resolveErrorItems)
-  }
-
-  const handleSelectSubtitle = (item: SubtitleItem) => {
-    const nextLanguage = item.subtitles?.[0]?.language ?? ""
-    setSelectedSubtitle(item)
-    setSelectedLanguage(nextLanguage)
-    setEditedContent(item.subtitles?.[0]?.content ?? "")
-  }
-
-  const handleSelectLanguage = (language: string) => {
-    const nextVariant = selectedSubtitle?.subtitles?.find((variant) => variant.language === language)
-    setSelectedLanguage(language)
-    setEditedContent(nextVariant?.content ?? "")
-  }
-
-  const handleSaveSubtitle = (content: string) => {
-    if (!selectedSubtitle || !selectedLanguage) return
-    const updateItem = (item: SubtitleItem) =>
-      item.id === selectedSubtitle.id
-        ? {
-            ...item,
-            subtitles: item.subtitles?.map((variant) =>
-              variant.language === selectedLanguage ? { ...variant, content } : variant,
-            ),
-          }
-        : item
-
-    setSubtitles((prev) => prev.map(updateItem))
-    setSelectedSubtitle((prev) => (prev ? updateItem(prev) : null))
-    setEditedContent(content)
-  }
+  const selectedId = workspace.selectedSubtitle?.id
 
   return (
-    <main className="min-h-screen bg-background">
-      <header className="border-b border-border">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-foreground">B站AI字幕工具</h1>
-          <div className="flex items-center gap-3">
-            {isLoggedIn && <span className="text-xs text-muted-foreground">已登录</span>}
-            <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+    <main className="relative min-h-screen overflow-hidden bg-background">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-0 h-[520px] bg-[radial-gradient(circle_at_18%_10%,color-mix(in_oklab,var(--primary)_16%,transparent),transparent_42%),radial-gradient(circle_at_84%_4%,color-mix(in_oklab,var(--brand-pink)_13%,transparent),transparent_36%)]" />
+
+      <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">
+        <div className="relative mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+          <a href="#top" className="flex items-center gap-2.5" aria-label="返回页面顶部">
+            <img src="/icon.svg" width="34" height="34" alt="" className="rounded-xl shadow-sm" />
+            <div>
+              <p className="text-sm font-bold tracking-tight text-foreground">BiliAISub</p>
+              <p className="hidden text-[10px] uppercase tracking-[0.18em] text-muted-foreground sm:block">Subtitle workspace</p>
+            </div>
+          </a>
+
+          <div className="flex items-center gap-1.5">
+            <span className={`mr-1 hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] sm:inline-flex ${
+              isLoggedIn
+                ? "border-emerald-500/20 bg-emerald-500/8 text-emerald-700 dark:text-emerald-300"
+                : "border-border bg-card/70 text-muted-foreground"
+            }`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${isLoggedIn ? "bg-emerald-500" : "bg-muted-foreground/50"}`} />
+              {isLoggedIn ? "B 站已连接" : "等待登录"}
+            </span>
+            <Button variant="ghost" size="icon-sm" asChild>
               <a href={GITHUB_REPOSITORY_URL} target="_blank" rel="noreferrer" aria-label="打开 GitHub 仓库">
                 <Github className="h-4 w-4" />
               </a>
@@ -222,205 +69,267 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-4 space-y-6">
-            <section className="p-4 rounded-lg border border-border bg-card">
-              <h2 className="text-sm font-medium text-foreground mb-4">账号登录</h2>
+      <div id="top" className="relative z-10 mx-auto max-w-7xl px-4 pb-16 pt-10 sm:px-6 sm:pt-14">
+        <section className="mx-auto max-w-4xl text-center">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-card/75 px-3 py-1.5 text-xs text-primary shadow-sm backdrop-blur">
+            <WandSparkles className="h-3.5 w-3.5" />
+            B 站官方 AI 字幕工作台
+          </div>
+          <h1 className="text-balance text-3xl font-bold tracking-[-0.035em] text-foreground sm:text-5xl">
+            <span className="block sm:inline">把视频字幕，</span><span className="brand-gradient-text">变成真正可用的文本</span>
+          </h1>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <FeaturePill icon={<Zap />} label="逐条流式返回" />
+            <FeaturePill icon={<Languages />} label="多语言获取" />
+            <FeaturePill icon={<LockKeyhole />} label="加密本机会话" />
+          </div>
+        </section>
+
+        <WorkflowRail
+          isLoggedIn={isLoggedIn}
+          hasVideos={workspace.resolvedVideos.length > 0}
+          hasSubtitles={workspace.subtitles.length > 0}
+          hasSelection={Boolean(workspace.selectedVariant)}
+        />
+
+        <section className="mt-6 grid items-start gap-5 lg:grid-cols-[350px_minmax(0,1fr)] xl:grid-cols-[390px_minmax(0,1fr)]">
+          <aside className="space-y-4">
+            <Panel>
+              <PanelHeader step="01" title="连接账号" />
               <QrLogin onLoginSuccess={() => setIsLoggedIn(true)} onLogout={handleLogout} />
-            </section>
+            </Panel>
 
             {isLoggedIn && (
-              <section className="p-4 rounded-lg border border-border bg-card">
-                <h2 className="text-sm font-medium text-foreground mb-4">添加视频</h2>
-                <VideoInput onSubmit={handleResolveVideos} disabled={!isLoggedIn || isResolving || isFetching} />
-              </section>
+              <Panel>
+                <PanelHeader step="02" title="添加视频" description="可直接粘贴一批链接或 BV 号。" />
+                <VideoInput onSubmit={workspace.resolveVideos} disabled={workspace.isBusy} />
+              </Panel>
             )}
 
-            {isLoggedIn && resolvedVideos.length > 0 && (
-              <section className="p-4 rounded-lg border border-border bg-card">
+            {isLoggedIn && workspace.needsPageSelection && (
+              <Panel>
                 <VideoPageSelector
-                  videos={resolvedVideos}
-                  selectedIds={selectedPageIds}
-                  disabled={isResolving || isFetching}
-                  onTogglePage={handleTogglePage}
-                  onSelectAll={handleSelectAllPages}
-                  onClear={handleClearSelectedPages}
-                  onSubmit={handleFetchSelectedPages}
+                  videos={workspace.resolvedVideos}
+                  selectedIds={workspace.selectedPageIds}
+                  disabled={workspace.isBusy}
+                  onTogglePage={workspace.togglePage}
+                  onSelectAll={workspace.selectAllPages}
+                  onClear={workspace.clearSelectedPages}
+                  onSubmit={workspace.fetchSelectedPages}
                 />
-              </section>
+              </Panel>
             )}
 
-            {subtitles.length > 0 && (
-              <section className="p-4 rounded-lg border border-border bg-card">
-                <h2 className="text-sm font-medium text-foreground mb-4">
-                  字幕列表
-                  <span className="ml-2 text-xs text-muted-foreground font-normal">
-                    {subtitles.filter((item) => item.status === "success").length}/{subtitles.length}
+            {workspace.subtitles.length > 0 && (
+              <Panel>
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">字幕任务</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      成功 {workspace.successCount}/{workspace.subtitles.length}
+                    </p>
+                  </div>
+                  {workspace.isFetching && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] text-primary">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      流式获取中
+                    </span>
+                  )}
+                </div>
+                <SubtitleList items={workspace.subtitles} selectedId={selectedId ?? undefined} onSelect={workspace.selectSubtitle} />
+              </Panel>
+            )}
+          </aside>
+
+          <div className="min-w-0 space-y-4">
+            {workspace.isResolving && (
+              <div className="flex items-center gap-3 rounded-2xl border border-primary/15 bg-primary/8 px-4 py-3 text-sm text-primary">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                正在解析视频信息与分 P，请稍候…
+              </div>
+            )}
+
+            <Panel className="min-h-[460px] sm:min-h-[590px]">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <FilePenLine className="h-4 w-4 text-primary" />
+                    字幕编辑器
+                  </p>
+                </div>
+                {workspace.selectedVariant && (
+                  <span className="hidden rounded-full bg-muted px-2.5 py-1 text-[11px] text-muted-foreground sm:inline-flex">
+                    {workspace.selectedVariant.language}
                   </span>
-                </h2>
-                <SubtitleList
-                  items={subtitles}
-                  selectedId={selectedSubtitle?.id}
-                  onSelect={handleSelectSubtitle}
-                />
-              </section>
-            )}
-          </div>
+                )}
+              </div>
 
-          <div className="lg:col-span-8 space-y-6">
-            <section className="p-4 rounded-lg border border-border bg-card">
-              <h2 className="text-sm font-medium text-foreground mb-4">字幕编辑</h2>
-              {selectedSubtitle && selectedVariant ? (
-                <div className="space-y-3">
-                  <div className="flex flex-wrap gap-2">
-                    {selectedSubtitle.subtitles?.map((variant) => (
-                      <button
-                        key={variant.language}
-                        type="button"
-                        onClick={() => handleSelectLanguage(variant.language)}
-                        className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${
-                          selectedLanguage === variant.language
-                            ? "bg-accent/10 border-accent/30 text-foreground"
-                            : "border-border text-muted-foreground hover:bg-muted/50"
-                        }`}
-                      >
-                        {variant.label || variant.language}
-                      </button>
-                    ))}
+              {workspace.selectedSubtitle && workspace.selectedVariant ? (
+                <div className="flex min-h-[390px] flex-col sm:min-h-[510px]">
+                  <div className="mb-3 flex flex-wrap gap-1.5" role="tablist" aria-label="字幕语言">
+                    {workspace.selectedSubtitle.subtitles?.map((variant) => {
+                      const isActive = workspace.selectedLanguage === variant.language
+                      const isEdited = variant.content !== variant.originalContent
+                      return (
+                        <button
+                          key={variant.language}
+                          type="button"
+                          role="tab"
+                          aria-selected={isActive}
+                          onClick={() => workspace.selectLanguage(variant.language)}
+                          className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                            isActive
+                              ? "border-primary/25 bg-primary/10 text-primary"
+                              : "border-border bg-background text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {variant.label || variant.language}
+                          {isEdited && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" title="已编辑" />}
+                        </button>
+                      )
+                    })}
                   </div>
                   <SubtitleEditor
-                    title={`${selectedSubtitle.title} · ${selectedVariant.label || selectedVariant.language}`}
-                    content={selectedVariant.content}
-                    onSave={handleSaveSubtitle}
-                    onChange={setEditedContent}
+                    title={`${workspace.selectedSubtitle.title} · ${workspace.selectedVariant.label || workspace.selectedVariant.language}`}
+                    content={workspace.selectedVariant.content}
+                    originalContent={workspace.selectedVariant.originalContent}
+                    onChange={workspace.changeSelectedContent}
+                    onReset={workspace.resetSelectedContent}
                   />
                 </div>
               ) : (
-                <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">
-                  {isLoggedIn
-                    ? subtitles.length > 0
-                      ? "从左侧选择一个视频以编辑字幕"
-                      : "添加视频后即可获取字幕"
-                    : "请先登录账号"}
-                </div>
+                <EditorEmptyState
+                  isLoggedIn={isLoggedIn}
+                  hasSubtitles={workspace.subtitles.length > 0}
+                  isBusy={workspace.isBusy}
+                />
               )}
-            </section>
+            </Panel>
 
-            <section className="p-4 rounded-lg border border-border bg-card">
-              <h2 className="text-sm font-medium text-foreground mb-4">导出下载</h2>
-              <DownloadPanel
-                selected={selectedSubtitle}
-                selectedLanguage={selectedLanguage}
-                editedContent={editedContent}
-                items={subtitles}
+            <Panel>
+              <PanelHeader
+                title="导出字幕"
+                icon={<Sparkles className="h-4 w-4" />}
               />
-            </section>
+              <DownloadPanel
+                selected={workspace.selectedSubtitle}
+                selectedLanguage={workspace.selectedLanguage}
+                items={workspace.subtitles}
+              />
+            </Panel>
           </div>
-        </div>
+        </section>
       </div>
 
-      <footer className="border-t border-border mt-12">
-        <div className="max-w-6xl mx-auto px-4 py-4 text-center text-xs text-muted-foreground">
-          登录态只保存在本机，字幕内容来自 B 站官方 AI 字幕。
+      <footer className="relative z-10 border-t border-border/70 bg-card/35">
+        <div className="mx-auto flex max-w-7xl items-center justify-center px-4 py-5 text-center text-xs text-muted-foreground sm:px-6">
+          <span>BiliAISub · 字幕内容来自 B 站官方 AI 字幕</span>
         </div>
       </footer>
     </main>
   )
 }
 
-function findVariant(item: SubtitleItem | null, language: string): SubtitleVariant | undefined {
-  if (!item?.subtitles?.length) return undefined
-  return item.subtitles.find((variant) => variant.language === language) ?? item.subtitles[0]
+function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <div className={`rounded-2xl border border-border/75 bg-card/88 p-4 shadow-[0_18px_50px_-34px_rgba(15,23,42,0.45)] backdrop-blur sm:p-5 ${className}`}>{children}</div>
 }
 
-function toSubtitleVariants(item: SubtitleResult): SubtitleVariant[] {
-  return (item.subtitles ?? []).map((subtitle) => ({
-    language: subtitle.language,
-    label: subtitle.label || subtitle.language,
-    content: subtitle.text,
-    srt: subtitle.srt,
-    rawJson: subtitle.raw_json,
-  }))
+function PanelHeader({
+  step,
+  title,
+  description,
+  icon,
+}: {
+  step?: string
+  title: string
+  description?: string
+  icon?: ReactNode
+}) {
+  return (
+    <div className="mb-4 flex items-start gap-3">
+      <span className="grid h-8 min-w-8 place-items-center rounded-lg bg-primary/10 text-[11px] font-bold text-primary">
+        {icon ?? step}
+      </span>
+      <div>
+        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+        {description && <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>}
+      </div>
+    </div>
+  )
 }
 
-function buildSubtitleItemBase(item: SubtitleResult, fallback?: SubtitleItem): SubtitleItem {
-  const bvid = item.bvid || item.source
-  const page = typeof item.page === "number" && item.page > 0 ? item.page : undefined
-  const title = formatSubtitleTitle(item)
-  return {
-    id: item.cid ? `${bvid}:${item.cid}` : fallback?.id ?? crypto.randomUUID(),
-    bvid,
-    cid: item.cid,
-    page,
-    part: item.part,
-    title: title || fallback?.title || item.source,
-    status: "loading",
-  }
+function FeaturePill({ icon, label }: { icon: ReactNode; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-card/70 px-3 py-1.5 text-xs text-muted-foreground shadow-sm [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:text-primary">
+      {icon}
+      {label}
+    </span>
+  )
 }
 
-function buildLoadingItemFromPage(page: ResolvedVideoPageResult): SubtitleItem {
-  return {
-    id: buildVideoPageId(page),
-    bvid: page.bvid,
-    cid: page.cid,
-    page: page.page,
-    part: page.part,
-    title: formatSubtitleTitle(page),
-    status: "loading",
-  }
+function WorkflowRail({
+  isLoggedIn,
+  hasVideos,
+  hasSubtitles,
+  hasSelection,
+}: {
+  isLoggedIn: boolean
+  hasVideos: boolean
+  hasSubtitles: boolean
+  hasSelection: boolean
+}) {
+  const steps = [
+    { label: "扫码登录", complete: isLoggedIn },
+    { label: "解析视频", complete: hasVideos },
+    { label: "获取字幕", complete: hasSubtitles },
+    { label: "编辑导出", complete: hasSelection },
+  ]
+
+  return (
+    <ol className="mx-auto mt-9 grid max-w-3xl grid-cols-4 rounded-2xl border border-border/70 bg-card/70 p-2 shadow-sm backdrop-blur">
+      {steps.map((step, index) => (
+        <li key={step.label} className="relative flex flex-col items-center gap-1.5 px-1 py-2 text-center">
+          {index > 0 && <span className="absolute right-1/2 top-[19px] -z-10 h-px w-full bg-border" />}
+          <span className={`grid h-6 w-6 place-items-center rounded-full border text-[10px] font-bold ${
+            step.complete
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border bg-background text-muted-foreground"
+          }`}>
+            {step.complete ? <Check className="h-3.5 w-3.5" /> : index + 1}
+          </span>
+          <span className="text-[10px] text-muted-foreground sm:text-xs">{step.label}</span>
+        </li>
+      ))}
+    </ol>
+  )
 }
 
-function buildSubtitleItemFromResult(item: SubtitleResult): SubtitleItem {
-  const base = buildSubtitleItemBase(item)
-  if (!item.ok) {
-    return {
-      ...base,
-      status: "error",
-      error: item.error || "获取失败",
-    }
-  }
+function EditorEmptyState({
+  isLoggedIn,
+  hasSubtitles,
+  isBusy,
+}: {
+  isLoggedIn: boolean
+  hasSubtitles: boolean
+  isBusy: boolean
+}) {
+  const message = isBusy
+    ? "字幕正在路上，获取到第一条后会自动打开"
+    : !isLoggedIn
+      ? ""
+      : hasSubtitles
+        ? "从左侧选择一条成功获取的字幕"
+        : "添加视频后，字幕会在这里逐条出现"
 
-  const variants = toSubtitleVariants(item)
-  return {
-    ...base,
-    status: variants.length > 0 ? "success" : "no-subtitle",
-    subtitles: variants,
-  }
-}
-
-function buildResolveErrorItem(item: ResolvedVideoResult): SubtitleItem {
-  return {
-    id: item.bvid || item.source || crypto.randomUUID(),
-    bvid: item.bvid || item.source,
-    title: item.title || item.source,
-    status: "error",
-    error: item.error || "解析视频失败",
-  }
-}
-
-function buildRequestErrorItem(source: string, index: number, error: unknown): SubtitleItem {
-  return {
-    id: `${source || "video"}:${index}`,
-    bvid: source,
-    title: source || `视频 ${index + 1}`,
-    status: "error",
-    error: error instanceof Error ? error.message : "请求失败",
-  }
-}
-
-function upsertSubtitleItem(items: SubtitleItem[], nextItem: SubtitleItem): SubtitleItem[] {
-  const index = items.findIndex((item) => item.id === nextItem.id)
-  if (index < 0) return [...items, nextItem]
-  return items.map((item, itemIndex) => (itemIndex === index ? nextItem : item))
-}
-
-function formatSubtitleTitle(item: Pick<SubtitleResult, "page" | "part" | "source" | "title">): string {
-  const title = (item.title || item.source || "").trim()
-  const part = (item.part || "").trim()
-  const page = typeof item.page === "number" && item.page > 0 ? item.page : undefined
-  if (!page && !part) return title
-  const prefix = page ? `P${page}` : "分P"
-  const suffix = part && part !== title ? ` · ${part}` : ""
-  return `${title} · ${prefix}${suffix}`
+  return (
+    <div className="grid min-h-[360px] place-items-center rounded-2xl border border-dashed border-border bg-muted/25 px-6 text-center sm:min-h-[490px]">
+      <div className="max-w-xs">
+        <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-primary/10 text-primary">
+          {isBusy ? <Loader2 className="h-6 w-6 animate-spin" /> : <FilePenLine className="h-6 w-6" />}
+        </div>
+        <p className="mt-4 text-sm font-medium text-foreground">准备好后，从这里开始校对</p>
+        {message && <p className="mt-2 text-xs leading-5 text-muted-foreground">{message}</p>}
+      </div>
+    </div>
+  )
 }

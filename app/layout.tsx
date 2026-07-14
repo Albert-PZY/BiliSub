@@ -3,8 +3,8 @@ import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'B站AI字幕工具',
-  description: '批量获取B站视频AI字幕，在线编辑，多格式下载',
+  title: 'BiliAISub · B站 AI 字幕工作台',
+  description: '批量获取 B 站视频官方 AI 字幕，在线校对并导出 TXT、SRT、JSON。',
   icons: {
     icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
     apple: '/icon.svg',
@@ -19,7 +19,7 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" className="bg-background" suppressHydrationWarning>
       <body className="font-sans antialiased min-h-screen">
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
         </ThemeProvider>
       </body>

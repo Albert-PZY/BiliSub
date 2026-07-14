@@ -1,76 +1,68 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Save, RotateCcw } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Check, Copy, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface SubtitleEditorProps {
   title?: string
   content: string
-  onSave?: (content: string) => void
-  onChange?: (content: string) => void
+  originalContent: string
+  onChange: (content: string) => void
+  onReset: () => void
 }
 
-export function SubtitleEditor({ title, content, onSave, onChange }: SubtitleEditorProps) {
-  const [value, setValue] = useState(content)
-  const [hasChanges, setHasChanges] = useState(false)
+export function SubtitleEditor({ title, content, originalContent, onChange, onReset }: SubtitleEditorProps) {
+  const [copied, setCopied] = useState(false)
+  const hasChanges = content !== originalContent
+  const lineCount = content ? content.split(/\r?\n/).length : 0
 
   useEffect(() => {
-    setValue(content)
-    setHasChanges(false)
+    setCopied(false)
   }, [content])
 
-  const handleChange = (newValue: string) => {
-    setValue(newValue)
-    setHasChanges(newValue !== content)
-    onChange?.(newValue)
-  }
-
-  const handleSave = () => {
-    onSave?.(value)
-    setHasChanges(false)
-  }
-
-  const handleReset = () => {
-    setValue(content)
-    setHasChanges(false)
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(content)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1600)
+    } catch {
+      setCopied(false)
+    }
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {title && (
-        <div className="flex items-center justify-between pb-3 border-b border-border mb-3">
-          <h3 className="text-sm font-medium text-foreground truncate pr-4">{title}</h3>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {hasChanges && (
-              <Button onClick={handleReset} variant="ghost" size="sm" className="h-7 px-2 text-xs">
-                <RotateCcw className="h-3 w-3 mr-1" />
-                重置
-              </Button>
-            )}
-            <Button
-              onClick={handleSave}
-              disabled={!hasChanges}
-              size="sm"
-              className="h-7 px-3 text-xs"
-            >
-              <Save className="h-3 w-3 mr-1" />
-              保存
-            </Button>
-          </div>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="mb-3 flex flex-col gap-3 border-b border-border/70 pb-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          {title && <h3 className="truncate text-sm font-semibold text-foreground" title={title}>{title}</h3>}
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {content.length.toLocaleString("zh-CN")} 字符 · {lineCount.toLocaleString("zh-CN")} 行
+            {hasChanges ? " · 修改已自动保存在本页" : " · 原始内容"}
+          </p>
         </div>
-      )}
-      <div className="flex-1 min-h-0">
-        <textarea
-          value={value}
-          onChange={(e) => handleChange(e.target.value)}
-          className="w-full h-full min-h-[300px] px-3 py-2 text-sm bg-input border border-border rounded-md resize-none font-mono leading-relaxed placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-          placeholder="选择一个视频以编辑字幕..."
-        />
+        <div className="flex shrink-0 items-center gap-1.5">
+          {hasChanges && (
+            <Button type="button" onClick={onReset} variant="ghost" size="sm">
+              <RotateCcw className="h-3.5 w-3.5" />
+              恢复原文
+            </Button>
+          )}
+          <Button type="button" onClick={handleCopy} variant="outline" size="sm" disabled={!content}>
+            {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? "已复制" : "复制"}
+          </Button>
+        </div>
       </div>
-      {hasChanges && (
-        <p className="text-xs text-accent mt-2">* 有未保存的更改</p>
-      )}
+
+      <textarea
+        value={content}
+        onChange={(event) => onChange(event.target.value)}
+        className="min-h-[340px] w-full flex-1 resize-y rounded-xl border border-border bg-background/75 px-4 py-3 font-mono text-[13px] leading-7 text-foreground shadow-inner outline-none transition placeholder:text-muted-foreground focus:border-primary/50 focus:ring-4 focus:ring-primary/10 sm:min-h-[430px]"
+        placeholder="字幕内容会显示在这里…"
+        spellCheck={false}
+        aria-label={title ? `编辑 ${title}` : "编辑字幕"}
+      />
     </div>
   )
 }
