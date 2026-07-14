@@ -1,0 +1,92 @@
+@startuml
+!pragma layout smetana
+title BiliAISub 全栈架构
+left to right direction
+
+skinparam backgroundColor #F8FBFF
+skinparam defaultFontName Microsoft YaHei
+skinparam defaultFontColor #24364B
+skinparam titleFontSize 22
+skinparam titleFontColor #173B61
+skinparam shadowing false
+skinparam roundcorner 16
+skinparam linetype ortho
+skinparam ArrowColor #4A86B8
+skinparam ArrowThickness 1.3
+skinparam packageStyle rectangle
+skinparam componentStyle rectangle
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #79BFE7
+  FontColor #24364B
+}
+skinparam node {
+  BackgroundColor #EEF8FF
+  BorderColor #4FA8D8
+  FontColor #173B61
+}
+skinparam database {
+  BackgroundColor #FFF2F7
+  BorderColor #E77AA4
+  FontColor #6C2D49
+}
+skinparam cloud {
+  BackgroundColor #F4EEFF
+  BorderColor #9A7BCD
+  FontColor #4C3970
+}
+
+actor "用户" as User
+
+node "浏览器 · React 19" as Browser {
+  component "页面入口\napp/page.tsx" as Page
+  component "交互组件\ncomponents/*" as Components
+  component "工作区状态\nhooks/use-subtitle-workspace.ts" as Workspace
+  component "API 客户端\nlib/local-api.ts" as LocalApi
+  component "字幕模型\nlib/subtitles.ts" as Model
+  component "文件导出\nTXT / SRT / JSON" as Export
+}
+
+node "Next.js 16 · Node.js Runtime" as Server {
+  component "认证接口\napp/api/auth/*" as AuthApi
+  component "视频解析接口\napp/api/videos/resolve" as ResolveApi
+  component "字幕流接口\napp/api/subtitles" as SubtitleApi
+  component "B 站服务封装\nlib/server/bilibili.ts" as BiliClient
+  component "输入边界与并发控制\nlib/server/request.ts" as RequestGuard
+  database "AES-256-GCM 会话\nHttpOnly Cookie" as Session
+}
+
+cloud "Bilibili" as Bilibili {
+  component "扫码登录接口" as BiliAuth
+  component "视频与分 P 接口" as BiliVideo
+  component "AI 字幕接口" as BiliSubtitle
+}
+
+User --> Page : 操作工作台
+Page --> Components : 组合界面
+Page --> Workspace : 触发业务动作
+Workspace --> Model : 读取 / 更新字幕
+Workspace --> LocalApi : JSON / NDJSON
+Components --> Export : 浏览器下载
+
+LocalApi --> AuthApi : 登录与状态
+LocalApi --> ResolveApi : 批量解析
+LocalApi --> SubtitleApi : 流式字幕
+
+AuthApi --> Session : 写入 / 清除
+SubtitleApi --> Session : 读取登录态
+ResolveApi --> RequestGuard : 去重 / 限流
+SubtitleApi --> RequestGuard : 校验 / 上限
+AuthApi --> BiliClient
+ResolveApi --> BiliClient
+SubtitleApi --> BiliClient
+
+BiliClient --> BiliAuth : HTTPS
+BiliClient --> BiliVideo : HTTPS
+BiliClient --> BiliSubtitle : HTTPS
+
+note bottom of Session
+  B 站 Cookie 只在服务端解密使用，
+  不会暴露给浏览器 JavaScript。
+end note
+@enduml
