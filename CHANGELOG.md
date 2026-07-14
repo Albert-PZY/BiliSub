@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/Albert-PZY/BiliSub/compare/v1.1.0...v1.2.0) (2026-07-14)
+
+
+### Features
+
+* redesign subtitle workspace and harden workflow ([28a3536](https://github.com/Albert-PZY/BiliSub/commit/28a3536b94bad6e519c6017f406734249bd47f18))
+* **ui:** redesign subtitle workspace ([2430c18](https://github.com/Albert-PZY/BiliSub/commit/2430c186c5c0d46559f6bbb5b5f37da67e63b460))
+
 ## [1.1.0](https://github.com/Albert-PZY/BiliSub/compare/v1.0.1...v1.1.0) (2026-06-07)
 
 
