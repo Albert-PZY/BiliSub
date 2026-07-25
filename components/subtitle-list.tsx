@@ -1,6 +1,6 @@
 "use client"
 
-import { CheckCircle2, FileText, Loader2, XCircle } from "lucide-react"
+import { AlertTriangle, CheckCircle2, FileText, Loader2, XCircle } from "lucide-react"
 import type { SubtitleItem } from "@/lib/subtitles"
 
 export type { SubtitleItem, SubtitleVariant } from "@/lib/subtitles"
@@ -24,54 +24,67 @@ export function SubtitleList({
 
   return (
     <div className="max-h-[360px] space-y-1.5 overflow-y-auto pr-1">
-      {items.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          onClick={() => item.status === "success" && onSelect?.(item)}
-          disabled={item.status !== "success"}
-          aria-pressed={item.status === "success" ? selectedId === item.id : undefined}
-          className={`group w-full rounded-xl border px-3 py-3 text-left transition ${
-            selectedId === item.id
-              ? "border-primary/30 bg-primary/8 shadow-sm"
-              : "border-transparent bg-muted/40 hover:border-border hover:bg-muted/70"
-          } ${item.status !== "success" ? "cursor-default opacity-65" : "cursor-pointer"}`}
-        >
-          <div className="flex items-start gap-2">
-            <div className="mt-0.5 shrink-0">
-              {item.status === "loading" && (
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              )}
-              {item.status === "success" && (
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-              )}
-              {item.status === "error" && (
-                <XCircle className="h-4 w-4 text-destructive" />
-              )}
-              {item.status === "no-subtitle" && (
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-foreground" title={item.title}>{item.title}</p>
-              <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                {item.status === "loading" && "正在获取字幕…"}
+      {items.map((item) => {
+        const isResolveError = item.kind === "resolve-error"
+        return (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => item.status === "success" && onSelect?.(item)}
+            disabled={item.status !== "success"}
+            aria-pressed={item.status === "success" ? selectedId === item.id : undefined}
+            className={`group w-full rounded-xl border px-3 py-3 text-left transition ${
+              selectedId === item.id
+                ? "border-primary/30 bg-primary/8 shadow-sm"
+                : isResolveError
+                  ? "border-transparent bg-muted/25 opacity-60"
+                  : "border-transparent bg-muted/40 hover:border-border hover:bg-muted/70"
+            } ${item.status !== "success" ? "cursor-default" : "cursor-pointer"}`}
+          >
+            <div className="flex items-start gap-2">
+              <div className="mt-0.5 shrink-0">
+                {item.status === "loading" && (
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                )}
                 {item.status === "success" && (
-                  <>
-                    <span>{item.subtitles?.length ?? 0} 种语言</span>
-                    <span aria-hidden="true">·</span>
-                    <span>点击编辑</span>
-                  </>
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                 )}
-                {item.status === "error" && (
-                  <span className="truncate text-destructive" title={item.error || "获取失败"}>{item.error || "获取失败"}</span>
+                {item.status === "error" && isResolveError && (
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
                 )}
-                {item.status === "no-subtitle" && "没有可用的 AI 字幕"}
+                {item.status === "error" && !isResolveError && (
+                  <XCircle className="h-4 w-4 text-destructive" />
+                )}
+                {item.status === "no-subtitle" && (
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-foreground" title={item.title}>{item.title}</p>
+                <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  {item.status === "loading" && "正在获取字幕…"}
+                  {item.status === "success" && (
+                    <>
+                      <span>{item.subtitles?.length ?? 0} 种语言</span>
+                      <span aria-hidden="true">·</span>
+                      <span>点击编辑</span>
+                    </>
+                  )}
+                  {item.status === "error" && isResolveError && (
+                    <span className="truncate text-amber-600 dark:text-amber-400" title={item.error || "解析失败"}>
+                      视频解析失败 · {item.error || "解析失败"}
+                    </span>
+                  )}
+                  {item.status === "error" && !isResolveError && (
+                    <span className="truncate text-destructive" title={item.error || "获取失败"}>{item.error || "获取失败"}</span>
+                  )}
+                  {item.status === "no-subtitle" && "没有可用的 AI 字幕"}
+                </div>
               </div>
             </div>
-          </div>
-        </button>
-      ))}
+          </button>
+        )
+      })}
     </div>
   )
 }

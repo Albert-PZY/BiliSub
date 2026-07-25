@@ -21,19 +21,32 @@ import { Button } from "@/components/ui/button"
 import { VideoInput } from "@/components/video-input"
 import { VideoPageSelector } from "@/components/video-page-selector"
 import { useSubtitleWorkspace } from "@/hooks/use-subtitle-workspace"
+import { type Account } from "@/lib/local-api"
+import { type AuthStatus } from "@/components/qr-login"
 
 const GITHUB_REPOSITORY_URL = "https://github.com/Albert-PZY/BiliSub"
 
+type AuthBadgeState = {
+  status: AuthStatus
+  account: Account | null
+}
+
 export default function Home() {
   const workspace = useSubtitleWorkspace()
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [auth, setAuth] = useState<AuthBadgeState>({ status: "checking", account: null })
   const { resetWorkspace } = workspace
 
+  const handleAuthChange = useCallback((status: AuthBadgeState["status"], account: Account | null) => {
+    setAuth({ status, account })
+  }, [])
+
   const handleLogout = useCallback(() => {
-    setIsLoggedIn(false)
+    setAuth({ status: "missing", account: null })
     resetWorkspace()
   }, [resetWorkspace])
 
+  // 改7：登录态以 QrLogin 上报为准，单一来源
+  const isLoggedIn = auth.status === "active" && Boolean(auth.account)
   const selectedId = workspace.selectedSubtitle?.id
 
   return (
@@ -52,12 +65,26 @@ export default function Home() {
 
           <div className="flex items-center gap-1.5">
             <span className={`mr-1 hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] sm:inline-flex ${
-              isLoggedIn
+              auth.status === "active"
                 ? "border-emerald-500/20 bg-emerald-500/8 text-emerald-700 dark:text-emerald-300"
-                : "border-border bg-card/70 text-muted-foreground"
+                : auth.status === "checking"
+                  ? "border-border bg-card/70 text-muted-foreground"
+                  : "border-border bg-card/70 text-muted-foreground"
             }`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${isLoggedIn ? "bg-emerald-500" : "bg-muted-foreground/50"}`} />
-              {isLoggedIn ? "B 站已连接" : "等待登录"}
+              <span className={`h-1.5 w-1.5 rounded-full ${
+                auth.status === "active"
+                  ? "bg-emerald-500"
+                  : auth.status === "checking"
+                    ? "bg-amber-500 animate-pulse"
+                    : "bg-muted-foreground/50"
+              }`} />
+              {auth.status === "active"
+                ? "B 站已连接"
+                : auth.status === "checking"
+                  ? "检查登录态…"
+                  : auth.status === "expired"
+                    ? "登录已失效"
+                    : "等待登录"}
             </span>
             <Button variant="ghost" size="icon-sm" asChild>
               <a href={GITHUB_REPOSITORY_URL} target="_blank" rel="noreferrer" aria-label="打开 GitHub 仓库">
@@ -96,7 +123,7 @@ export default function Home() {
           <aside className="space-y-4">
             <Panel>
               <PanelHeader step="01" title="连接账号" />
-              <QrLogin onLoginSuccess={() => setIsLoggedIn(true)} onLogout={handleLogout} />
+              <QrLogin onStatusChange={handleAuthChange} onLogout={handleLogout} />
             </Panel>
 
             {isLoggedIn && (
@@ -126,7 +153,7 @@ export default function Home() {
                   <div>
                     <p className="text-sm font-semibold text-foreground">字幕任务</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      成功 {workspace.successCount}/{workspace.subtitles.length}
+                      成功 {workspace.successCount}/{workspace.taskCount}
                     </p>
                   </div>
                   {workspace.isFetching && (
@@ -286,10 +313,10 @@ function WorkflowRail({
   ]
 
   return (
-    <ol className="mx-auto mt-9 grid max-w-3xl grid-cols-4 rounded-2xl border border-border/70 bg-card/70 p-2 shadow-sm backdrop-blur">
+    <ol className="mx-auto mt-9 grid max-w-3xl grid-cols-2 gap-1 rounded-2xl border border-border/70 bg-card/70 p-2 shadow-sm backdrop-blur sm:grid-cols-4 sm:gap-0">
       {steps.map((step, index) => (
         <li key={step.label} className="relative flex flex-col items-center gap-1.5 px-1 py-2 text-center">
-          {index > 0 && <span className="absolute right-1/2 top-[19px] -z-10 h-px w-full bg-border" />}
+          {index > 0 && <span className="absolute right-1/2 top-[19px] -z-10 hidden h-px w-full bg-border sm:block" />}
           <span className={`grid h-6 w-6 place-items-center rounded-full border text-[10px] font-bold ${
             step.complete
               ? "border-primary bg-primary text-primary-foreground"
@@ -316,10 +343,16 @@ function EditorEmptyState({
   const message = isBusy
     ? "字幕正在路上，获取到第一条后会自动打开"
     : !isLoggedIn
-      ? ""
+      ? "先在左侧扫码连接 B 站，字幕会在这里逐条出现"
       : hasSubtitles
         ? "从左侧选择一条成功获取的字幕"
         : "添加视频后，字幕会在这里逐条出现"
+
+  const headline = isBusy
+    ? "字幕正在云端拉取"
+    : !isLoggedIn
+      ? "还没有可校对的字幕"
+      : "准备好后，从这里开始校对"
 
   return (
     <div className="grid min-h-[360px] place-items-center rounded-2xl border border-dashed border-border bg-muted/25 px-6 text-center sm:min-h-[490px]">
@@ -327,8 +360,8 @@ function EditorEmptyState({
         <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-primary/10 text-primary">
           {isBusy ? <Loader2 className="h-6 w-6 animate-spin" /> : <FilePenLine className="h-6 w-6" />}
         </div>
-        <p className="mt-4 text-sm font-medium text-foreground">准备好后，从这里开始校对</p>
-        {message && <p className="mt-2 text-xs leading-5 text-muted-foreground">{message}</p>}
+        <p className="mt-4 text-sm font-medium text-foreground">{headline}</p>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">{message}</p>
       </div>
     </div>
   )

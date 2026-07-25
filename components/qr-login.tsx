@@ -14,25 +14,41 @@ import {
 
 type LoginStatus = "idle" | "checking" | "loading" | "scanning" | "confirming" | "success" | "expired" | "failed"
 
+/** header 徽章用到的登录态：在后端 SessionStatus 基础上多一个前端过渡态 checking。 */
+export type AuthStatus = SessionStatus["status"] | "checking"
+
+/** 把内部富状态映射为 header 可渲染的精简状态。 */
+function toSessionStatus(status: LoginStatus): AuthStatus {
+  if (status === "success") return "active"
+  if (status === "expired") return "expired"
+  if (status === "checking") return "checking"
+  return "missing"
+}
+
 export function QrLogin({
-  onLoginSuccess,
+  onStatusChange,
   onLogout,
 }: {
-  onLoginSuccess?: (user: Account) => void
+  onStatusChange?: (status: AuthStatus, account: Account | null) => void
   onLogout?: () => void
 }) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pollControllerRef = useRef<AbortController | null>(null)
   const requestControllerRef = useRef<AbortController | null>(null)
-  const onLoginSuccessRef = useRef(onLoginSuccess)
+  const onStatusChangeRef = useRef(onStatusChange)
   const onLogoutRef = useRef(onLogout)
   const [status, setStatus] = useState<LoginStatus>("checking")
   const [qrUrl, setQrUrl] = useState("")
   const [message, setMessage] = useState("正在检查本机登录态")
   const [user, setUser] = useState<Account | null>(null)
 
-  onLoginSuccessRef.current = onLoginSuccess
+  onStatusChangeRef.current = onStatusChange
   onLogoutRef.current = onLogout
+
+  // 改7：统一上报当前登录态，作为 header 徽章的单一来源
+  const report = useCallback((nextStatus: LoginStatus, account: Account | null) => {
+    onStatusChangeRef.current?.(toSessionStatus(nextStatus), account)
+  }, [])
 
   const stopPolling = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current)
@@ -50,8 +66,8 @@ export function QrLogin({
     setUser(account)
     setStatus("success")
     setMessage(nextMessage)
-    onLoginSuccessRef.current?.(account)
-  }, [])
+    report("success", account)
+  }, [report])
 
   const refreshStatus = useCallback(async () => {
     cancelRequest()
@@ -59,24 +75,28 @@ export function QrLogin({
     requestControllerRef.current = controller
     setStatus("checking")
     setMessage("正在检查本机登录态")
+    report("checking", null)
 
     try {
       const snapshot = await postJson<SessionStatus>("/api/auth/status", {}, { signal: controller.signal })
       if (snapshot.status === "active" && snapshot.account) {
         setLoggedIn(snapshot.account, "登录态可用，仅保存在当前设备")
       } else {
+        const next: LoginStatus = snapshot.status === "expired" ? "expired" : "idle"
         setUser(null)
-        setStatus(snapshot.status === "expired" ? "expired" : "idle")
+        setStatus(next)
         setMessage(snapshot.last_error || "扫码后即可开始获取字幕")
+        report(next, null)
       }
     } catch (error) {
       if (isAbortError(error)) return
       setStatus("failed")
       setMessage(error instanceof Error ? error.message : "检查登录态失败")
+      report("failed", null)
     } finally {
       if (requestControllerRef.current === controller) requestControllerRef.current = null
     }
-  }, [cancelRequest, setLoggedIn])
+  }, [cancelRequest, report, setLoggedIn])
 
   useEffect(() => {
     void refreshStatus()
@@ -108,14 +128,17 @@ export function QrLogin({
           if (result.status === "scanned" || result.status === "confirmed") {
             setStatus("confirming")
             setMessage("已扫码，请在手机上确认登录")
+            report("confirming", null)
           } else if (result.status === "expired" || result.status === "failed") {
             stopPolling()
             setStatus(result.status)
             setMessage(result.message || "二维码已失效，请重新获取")
+            report(result.status, null)
             return
           } else {
             setStatus("scanning")
             setMessage("等待 B 站 App 扫码")
+            report("scanning", null)
           }
           timerRef.current = setTimeout(poll, interval)
         } catch (error) {
@@ -123,12 +146,13 @@ export function QrLogin({
           stopPolling()
           setStatus("failed")
           setMessage(error instanceof Error ? error.message : "登录轮询失败")
+          report("failed", null)
         }
       }
 
       timerRef.current = setTimeout(poll, interval)
     },
-    [setLoggedIn, stopPolling],
+    [report, setLoggedIn, stopPolling],
   )
 
   const generateQrCode = useCallback(async () => {
@@ -138,21 +162,24 @@ export function QrLogin({
     requestControllerRef.current = controller
     setStatus("loading")
     setMessage("正在生成安全登录二维码")
+    report("loading", null)
 
     try {
       const session = await postJson<LoginSession>("/api/auth/login/start", {}, { signal: controller.signal })
       setQrUrl(session.qr_svg_url)
       setStatus("scanning")
       setMessage("请使用 B 站 App 扫码登录")
+      report("scanning", null)
       pollLogin(session)
     } catch (error) {
       if (isAbortError(error)) return
       setStatus("failed")
       setMessage(error instanceof Error ? error.message : "生成二维码失败")
+      report("failed", null)
     } finally {
       if (requestControllerRef.current === controller) requestControllerRef.current = null
     }
-  }, [cancelRequest, pollLogin, stopPolling])
+  }, [cancelRequest, pollLogin, report, stopPolling])
 
   const handleLogout = async () => {
     stopPolling()
@@ -165,11 +192,13 @@ export function QrLogin({
       setQrUrl("")
       setStatus("idle")
       setMessage("已清除本机登录态")
+      report("idle", null)
       onLogoutRef.current?.()
     } catch (error) {
       if (isAbortError(error)) return
       setStatus("failed")
       setMessage(error instanceof Error ? error.message : "退出登录失败")
+      report("failed", null)
     } finally {
       if (requestControllerRef.current === controller) requestControllerRef.current = null
     }
@@ -208,7 +237,7 @@ export function QrLogin({
   return (
     <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-border bg-background/50 p-5">
       {(isLoading || showQrCode) && (
-        <div className="relative grid h-44 w-44 place-items-center overflow-hidden rounded-2xl border border-border bg-white p-3 shadow-sm">
+        <div className="relative grid h-44 w-44 place-items-center overflow-hidden rounded-2xl border border-border bg-white p-3 shadow-sm ring-1 ring-transparent dark:ring-white/10">
           {isLoading ? (
             <RefreshCw className="h-6 w-6 animate-spin text-primary" />
           ) : (
