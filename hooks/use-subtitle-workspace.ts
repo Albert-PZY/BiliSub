@@ -13,11 +13,16 @@ import {
   type VideoSource,
 } from "@/lib/local-api"
 import {
+  buildLoadingItemFromPage,
+  buildRequestErrorItem,
+  buildResolveErrorItem,
   buildSubtitleItemFromResult,
+  countSubtitleTasks,
   findSubtitleVariant,
-  formatSubtitleTitle,
-  updateSubtitleContent,
+  hasUnexportedEdits,
+  mergeSubtitleItems,
   upsertSubtitleItem,
+  updateSubtitleContent,
   type SubtitleItem,
 } from "@/lib/subtitles"
 
@@ -77,6 +82,7 @@ export function useSubtitleWorkspace() {
       pages: ResolvedVideoPageResult[],
       language: SubtitleLanguageMode,
       initialItems: SubtitleItem[] = [],
+      mode: "replace" | "append" = "replace",
     ) => {
       subtitleControllerRef.current?.abort()
       const controller = new AbortController()
@@ -85,9 +91,14 @@ export function useSubtitleWorkspace() {
       let selectedFirstSuccess = false
 
       setIsFetching(true)
-      setSubtitles([...initialItems, ...loadingItems])
-      setSelectedSubtitleId(null)
-      setSelectedLanguage("")
+      if (mode === "append") {
+        // 增量追加：保留已有 success/loading（尤其单 P 先行得到的字幕），追加新的多 P loading 项
+        setSubtitles((previous) => mergeSubtitleItems([...previous, ...initialItems], loadingItems))
+      } else {
+        setSubtitles([...initialItems, ...loadingItems])
+        setSelectedSubtitleId(null)
+        setSelectedLanguage("")
+      }
 
       try {
         await streamPostJson<SubtitleStreamEvent>(
@@ -98,6 +109,10 @@ export function useSubtitleWorkspace() {
             const nextItem = buildSubtitleItemFromResult(event.item)
             setSubtitles((previous) => upsertSubtitleItem(previous, nextItem))
 
+            if (mode === "append" && selectedSubtitleId) {
+              // append 模式不抢占用户当前选中的字幕
+              return
+            }
             if (nextItem.status === "success" && !selectedFirstSuccess) {
               selectedFirstSuccess = true
               selectSubtitle(nextItem)
@@ -125,11 +140,19 @@ export function useSubtitleWorkspace() {
         }
       }
     },
-    [selectSubtitle],
+    [selectSubtitle, selectedSubtitleId],
   )
 
   const resolveVideos = useCallback(
     async (videos: VideoSource[], language: SubtitleLanguageMode) => {
+      // 改1：重新解析会清空已有字幕与编辑，若有未导出编辑先二次确认
+      if (hasUnexportedEdits(subtitles)) {
+        const confirmed = typeof window !== "undefined"
+          ? window.confirm("当前已有未导出的编辑内容，重新解析会清空这些字幕与编辑，是否继续？")
+          : true
+        if (!confirmed) return
+      }
+
       cancelRequests()
       const controller = new AbortController()
       resolveControllerRef.current = controller
@@ -140,8 +163,8 @@ export function useSubtitleWorkspace() {
       setSelectedPageIds(new Set())
       clearResults()
 
-      let pagesToFetch: ResolvedVideoPageResult[] | null = null
-      let initialItems: SubtitleItem[] = []
+      let singlePagesToFetch: ResolvedVideoPageResult[] | null = null
+      let resolveErrors: SubtitleItem[] = []
 
       try {
         const payload = await postJson<{ items: ResolvedVideoResult[] }>(
@@ -150,24 +173,27 @@ export function useSubtitleWorkspace() {
           { signal: controller.signal },
         )
         const items = payload.items
-        const pages = items.flatMap((item) => item.pages ?? [])
-        const resolveErrors = items.filter((item) => !item.ok).map(buildResolveErrorItem)
         const needsPageSelection = items.some((item) => (item.pages?.length ?? 0) > 1)
-        const defaultPages = needsPageSelection
-          ? items.flatMap((item) => ((item.pages?.length ?? 0) === 1 ? item.pages ?? [] : []))
-          : pages
+        resolveErrors = items.filter((item) => !item.ok).map(buildResolveErrorItem)
+
+        // 改2：单 P 视频（仅一页的视频）始终加入默认并立即获取；多 P 视频的分 P 留给选择器
+        const singlePages = items.flatMap((item) =>
+          (item.pages?.length ?? 0) === 1 ? item.pages ?? [] : [],
+        )
+        const allPages = items.flatMap((item) => item.pages ?? [])
 
         setResolvedVideos(items)
-        setSelectedPageIds(new Set(defaultPages.map(buildVideoPageId)))
+        // 全部为单 P（无多 P 视频）时，全量选中所有页；含多 P 时，只选中单 P 页让用户决定多 P
+        const defaultSelected = needsPageSelection ? singlePages : allPages
+        setSelectedPageIds(new Set(defaultSelected.map(buildVideoPageId)))
 
-        if (!needsPageSelection && pages.length > 0) {
-          pagesToFetch = pages
-          initialItems = resolveErrors
+        if (items.some((item) => item.ok) && singlePages.length > 0) {
+          singlePagesToFetch = singlePages
         } else if (resolveErrors.length > 0) {
           setSubtitles(resolveErrors)
         }
 
-        if (pages.length === 0) {
+        if (allPages.length === 0) {
           setSubtitles(resolveErrors.length > 0 ? resolveErrors : items.map(buildResolveErrorItem))
         }
       } catch (error) {
@@ -180,11 +206,11 @@ export function useSubtitleWorkspace() {
         }
       }
 
-      if (pagesToFetch && !controller.signal.aborted) {
-        await fetchSubtitlesForPages(pagesToFetch, language, initialItems)
+      if (singlePagesToFetch && !controller.signal.aborted) {
+        await fetchSubtitlesForPages(singlePagesToFetch, language, resolveErrors, "replace")
       }
     },
-    [cancelRequests, clearResults, fetchSubtitlesForPages],
+    [cancelRequests, clearResults, fetchSubtitlesForPages, subtitles],
   )
 
   const togglePage = useCallback((page: ResolvedVideoPageResult) => {
@@ -205,13 +231,21 @@ export function useSubtitleWorkspace() {
   const clearSelectedPages = useCallback(() => setSelectedPageIds(new Set()), [])
 
   const fetchSelectedPages = useCallback(async () => {
-    const pages = resolvedVideos
+    // 改3：在已有字幕基础上增量追加多 P 选中的分 P，不覆盖已获取的单 P 字幕
+    const candidatePages = resolvedVideos
       .flatMap((video) => video.pages ?? [])
       .filter((page) => selectedPageIds.has(buildVideoPageId(page)))
-    if (pages.length === 0) return
+    // 排除已经成功或正在加载的（避免重复拉取）
+    const pagesToFetch = candidatePages.filter((page) => {
+      const id = buildVideoPageId(page)
+      return !subtitles.some(
+        (item) => item.id === id && (item.status === "success" || item.status === "loading"),
+      )
+    })
+    if (pagesToFetch.length === 0) return
     const resolveErrors = resolvedVideos.filter((item) => !item.ok).map(buildResolveErrorItem)
-    await fetchSubtitlesForPages(pages, subtitleLanguage, resolveErrors)
-  }, [fetchSubtitlesForPages, resolvedVideos, selectedPageIds, subtitleLanguage])
+    await fetchSubtitlesForPages(pagesToFetch, subtitleLanguage, resolveErrors, "append")
+  }, [fetchSubtitlesForPages, resolvedVideos, selectedPageIds, subtitleLanguage, subtitles])
 
   const selectLanguage = useCallback((language: string) => setSelectedLanguage(language), [])
 
@@ -229,6 +263,8 @@ export function useSubtitleWorkspace() {
   }, [changeSelectedContent, selectedVariant])
 
   const successCount = subtitles.filter((item) => item.status === "success").length
+  // 改4：任务分母只算进入过字幕获取流程的项，不含 resolve-error 占位
+  const taskCount = countSubtitleTasks(subtitles)
   return {
     subtitles,
     selectedSubtitle,
@@ -241,6 +277,7 @@ export function useSubtitleWorkspace() {
     isBusy: isResolving || isFetching,
     needsPageSelection: resolvedVideos.some((item) => (item.pages?.length ?? 0) > 1),
     successCount,
+    taskCount,
     resetWorkspace,
     resolveVideos,
     togglePage,
@@ -251,37 +288,5 @@ export function useSubtitleWorkspace() {
     selectLanguage,
     changeSelectedContent,
     resetSelectedContent,
-  }
-}
-
-function buildLoadingItemFromPage(page: ResolvedVideoPageResult): SubtitleItem {
-  return {
-    id: buildVideoPageId(page),
-    bvid: page.bvid,
-    cid: page.cid,
-    page: page.page,
-    part: page.part,
-    title: formatSubtitleTitle(page),
-    status: "loading",
-  }
-}
-
-function buildResolveErrorItem(item: ResolvedVideoResult): SubtitleItem {
-  return {
-    id: `resolve:${item.bvid || item.source}`,
-    bvid: item.bvid || item.source,
-    title: item.title || item.source,
-    status: "error",
-    error: item.error || "解析视频失败",
-  }
-}
-
-function buildRequestErrorItem(source: string, index: number, error: unknown): SubtitleItem {
-  return {
-    id: `request:${source || "video"}:${index}`,
-    bvid: source,
-    title: source || `视频 ${index + 1}`,
-    status: "error",
-    error: error instanceof Error ? error.message : "请求失败",
   }
 }

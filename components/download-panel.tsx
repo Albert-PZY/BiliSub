@@ -1,8 +1,9 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Braces, CheckCircle2, Download, FileText, TimerReset } from "lucide-react"
+import { Braces, CheckCircle2, Download, FileText, Loader2, TimerReset } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useToast } from "@/components/ui/toast"
 import type { SubtitleItem, SubtitleVariant } from "@/lib/subtitles"
 
 type FormatType = "txt" | "srt" | "json"
@@ -21,8 +22,10 @@ interface DownloadPanelProps {
 }
 
 export function DownloadPanel({ selected, selectedLanguage, items = [] }: DownloadPanelProps) {
+  const { toast } = useToast()
   const [scope, setScope] = useState<DownloadScope>("current")
   const [downloadedCount, setDownloadedCount] = useState(0)
+  const [isExporting, setIsExporting] = useState(false)
   const successful = useMemo(() => items.filter((item) => item.status === "success"), [items])
   const currentVariant = selected ? findVariant(selected, selectedLanguage) : undefined
   const targets = useMemo(
@@ -46,17 +49,30 @@ export function DownloadPanel({ selected, selectedLanguage, items = [] }: Downlo
     },
   ]
 
-  const handleDownload = (format: FormatType) => {
-    for (const target of targets) {
+  // 改10：串行触发下载（间隔 150ms）降低浏览器多文件拦截，并用 toast 统一反馈
+  const handleDownload = async (format: FormatType) => {
+    if (targets.length === 0 || isExporting) return
+    setIsExporting(true)
+    for (let i = 0; i < targets.length; i++) {
+      const target = targets[i]
       const output = buildOutput(target.variant, format)
       downloadFile(
         `${buildSubtitleFileStem(target.item)}.${safeFileName(target.variant.language)}.${format}`,
         output,
         format,
       )
+      if (i < targets.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 150))
+      }
     }
     setDownloadedCount(targets.length)
     window.setTimeout(() => setDownloadedCount(0), 1800)
+    if (targets.length > 1) {
+      toast(`已生成 ${targets.length} 个文件，若浏览器拦截请在地址栏允许`, "success")
+    } else {
+      toast("已生成 1 个文件", "success")
+    }
+    setIsExporting(false)
   }
 
   return (
@@ -91,15 +107,17 @@ export function DownloadPanel({ selected, selectedLanguage, items = [] }: Downlo
               key={format.type}
               type="button"
               onClick={() => handleDownload(format.type)}
-              disabled={targets.length === 0}
+              disabled={targets.length === 0 || isExporting}
               variant="outline"
               className="h-auto justify-start rounded-xl px-3 py-3 text-left"
             >
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-                <Icon className="h-4 w-4" />
+                {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
               </span>
               <span className="min-w-0">
-                <span className="block text-xs font-semibold">{format.label}</span>
+                <span className="block text-xs font-semibold">
+                  {isExporting && targets.length > 1 ? `正在导出 ${targets.length} 个…` : format.label}
+                </span>
                 <span className="block truncate text-[10px] font-normal text-muted-foreground">{format.desc}</span>
               </span>
               <Download className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
