@@ -10,5 +10,7 @@ htmlcov/
 !.env.example
 node_modules/
 .next/
+dist/
 out/
 .vercel/
+.playwright-mcp/
