@@ -10,8 +10,10 @@ permissions:
   contents: read
 
 jobs:
+  # 分支保护同时要求 `CI` 与 `verify` 两个检查上下文，
+  # 因此保留双 job 结构：verify 跑真实检查，required-status 只做汇总门禁。
   verify:
-    name: verify
+    name: CI
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -44,3 +46,11 @@ jobs:
 
       - name: Build API
         run: pnpm build:api
+
+  required-status:
+    name: verify
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - name: Confirm CI passed
+        run: echo "CI passed"
