@@ -1,118 +1,81 @@
-<svg width="1200" height="620" viewBox="0 0 1200 620" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
-  <title id="title">BiliAISub B站 AI 字幕工作台</title>
-  <desc id="desc">展示扫码登录、视频解析、多语言字幕编辑和文件导出的 BiliAISub 工作台界面。</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
+  <title id="title">BiliAISub B 站 AI 字幕工作台</title>
+  <desc id="desc">展示从视频链接、分 P 选择到字幕编辑和文件导出的 BiliAISub 工作台结构。</desc>
   <defs>
-    <linearGradient id="bg" x1="70" y1="30" x2="1120" y2="600" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#102B4A"/>
-      <stop offset="0.52" stop-color="#14243D"/>
-      <stop offset="1" stop-color="#281A3D"/>
+    <linearGradient id="heroBrand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7C5CFF"/>
+      <stop offset="1" stop-color="#4B2BE0"/>
     </linearGradient>
-    <linearGradient id="brand" x1="120" y1="102" x2="460" y2="230" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#5CCBFF"/>
-      <stop offset="1" stop-color="#FF6EAC"/>
+    <linearGradient id="heroRule" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7C5CFF"/>
+      <stop offset="1" stop-color="#FF5C8A"/>
     </linearGradient>
-    <linearGradient id="line" x1="130" y1="0" x2="840" y2="0" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#52C7FF"/>
-      <stop offset="1" stop-color="#F66BA7"/>
-    </linearGradient>
-    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%" color-interpolation-filters="sRGB">
-      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#06111F" flood-opacity="0.42"/>
-    </filter>
-    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="26"/>
-    </filter>
-    <pattern id="grid" width="36" height="36" patternUnits="userSpaceOnUse">
-      <path d="M36 0H0V36" stroke="#B3D7F6" stroke-opacity="0.07"/>
-    </pattern>
   </defs>
+  <rect width="1200" height="420" rx="16" fill="#0B0E1E"/>
+  <path d="M48 48H1152M48 372H1152" stroke="#3B4478" stroke-width="1"/>
+  <path d="M48 74H414M48 346H414" stroke="url(#heroRule)" stroke-width="2"/>
 
-  <rect width="1200" height="620" rx="30" fill="url(#bg)"/>
-  <circle cx="1015" cy="48" r="180" fill="#3F9FFF" fill-opacity="0.2" filter="url(#glow)"/>
-  <circle cx="142" cy="558" r="170" fill="#F162A4" fill-opacity="0.13" filter="url(#glow)"/>
-  <rect x="1" y="1" width="1198" height="618" rx="29" fill="url(#grid)"/>
-  <rect x="1" y="1" width="1198" height="618" rx="29" stroke="#8ACBFF" stroke-opacity="0.2"/>
+  <g font-family="Segoe UI, Microsoft YaHei, PingFang SC, sans-serif">
+    <rect x="64" y="76" width="42" height="42" rx="8" fill="url(#heroBrand)"/>
+    <path d="M78 88L92 97L78 106V88Z" fill="#0B0E1E"/>
+    <path d="M75 111H96M75 116H89" stroke="#FF5C8A" stroke-width="2" stroke-linecap="round"/>
+    <text x="120" y="96" fill="#EDF0FF" font-size="20" font-weight="700">BiliAISub</text>
+    <text x="120" y="116" fill="#868DBA" font-family="Cascadia Code, SFMono-Regular, Consolas, monospace" font-size="11">SUBTITLE WORKSPACE</text>
 
-  <g opacity="0.92">
-    <rect x="78" y="67" width="44" height="44" rx="14" fill="#E7F8FF"/>
-    <path d="M92 83.2C92 80.9 93.9 79 96.2 79H103.8C106.1 79 108 80.9 108 83.2V94.8C108 97.1 106.1 99 103.8 99H96.2C93.9 99 92 97.1 92 94.8V83.2Z" fill="#0B9FE5"/>
-    <path d="M96 85.6L99.9 89.2L104 85.6" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="96.8" cy="93.8" r="1.6" fill="white"/>
-    <circle cx="103.2" cy="93.8" r="1.6" fill="white"/>
-    <text x="137" y="88" fill="white" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="18" font-weight="700">BiliAISub</text>
-    <text x="138" y="107" fill="#9DB8D1" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="10" letter-spacing="2.5">SUBTITLE WORKSPACE</text>
+    <text x="64" y="178" fill="#868DBA" font-family="Cascadia Code, SFMono-Regular, Consolas, monospace" font-size="13">B 站 AI 字幕工作台</text>
+    <text x="64" y="230" fill="#EDF0FF" font-size="42" font-weight="700">从视频链接</text>
+    <text x="64" y="280" fill="#9D88FF" font-size="42" font-weight="700">到可编辑字幕</text>
+    <text x="64" y="316" fill="#C2C8EC" font-size="16">扫码登录 · 解析分 P · 流式获取 · 在线校对 · 文件导出</text>
+
+    <g font-size="13">
+      <text x="64" y="354" fill="#FF5C8A">20 个视频 / 批</text>
+      <text x="190" y="354" fill="#868DBA">100 个分 P / 次</text>
+      <text x="330" y="354" fill="#868DBA">TXT · SRT · JSON</text>
+    </g>
   </g>
 
-  <text x="80" y="189" fill="white" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="40" font-weight="750">把 B 站 AI 字幕</text>
-  <text x="80" y="240" fill="url(#brand)" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="40" font-weight="750">变成真正可用的文本</text>
-  <text x="82" y="278" fill="#B9CBE0" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="15">扫码登录 · 批量解析 · 多语言校对 · 一键导出</text>
+  <g transform="translate(480 52)" font-family="Segoe UI, Microsoft YaHei, PingFang SC, sans-serif">
+    <rect width="656" height="316" rx="10" fill="#10152C" stroke="#262D55"/>
+    <rect width="656" height="48" rx="10" fill="#171D3B"/>
+    <path d="M0 48H656" stroke="#262D55" stroke-width="1"/>
+    <circle cx="25" cy="24" r="5" fill="#7C5CFF"/>
+    <text x="42" y="29" fill="#EDF0FF" font-size="14" font-weight="700">字幕工作台</text>
+    <rect x="488" y="13" width="112" height="22" rx="11" fill="#201A4D" stroke="#7C5CFF"/>
+    <circle cx="503" cy="24" r="4" fill="#7C5CFF"/>
+    <text x="514" y="28" fill="#C2C8EC" font-size="10">B 站已连接</text>
 
-  <g transform="translate(80 337)">
-    <circle cx="10" cy="10" r="10" fill="#54C8FF"/>
-    <path d="M6 10L9 13L15 7" stroke="#0E2C49" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    <text x="30" y="15" fill="#E6F5FF" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="14">官方 AI 字幕接口</text>
-    <circle cx="10" cy="55" r="10" fill="#FF77B1"/>
-    <path d="M7 55H13M10 52V58" stroke="#451A37" stroke-width="2" stroke-linecap="round"/>
-    <text x="30" y="60" fill="#E6F5FF" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="14">流式反馈，不必等待全部完成</text>
-    <circle cx="10" cy="100" r="10" fill="#A7E8FF"/>
-    <path d="M6.5 100H13.5" stroke="#0E2C49" stroke-width="2" stroke-linecap="round"/>
-    <text x="30" y="105" fill="#E6F5FF" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="14">登录凭据只留在服务端</text>
+    <rect x="18" y="66" width="176" height="232" rx="8" fill="#171D3B"/>
+    <text x="34" y="90" fill="#EDF0FF" font-size="13" font-weight="700">字幕任务</text>
+    <text x="34" y="109" fill="#868DBA" font-family="Cascadia Code, Consolas, monospace" font-size="10">成功 3 / 4</text>
+    <rect x="34" y="126" width="144" height="42" rx="6" fill="#201A4D" stroke="#7C5CFF"/>
+    <circle cx="50" cy="147" r="6" fill="#7C5CFF"/>
+    <path d="M47 147L50 150L55 144" stroke="#0B0E1E" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="64" y="147" fill="#EDF0FF" font-size="10" font-weight="700">BV1xx411c7mD</text>
+    <text x="64" y="160" fill="#868DBA" font-size="9">3 种语言 · 已完成</text>
+    <rect x="34" y="178" width="144" height="42" rx="6" fill="#212A52"/>
+    <circle cx="50" cy="199" r="6" fill="#FF5C8A"/>
+    <path d="M50 195V203M46 199H54" stroke="#0B0E1E" stroke-width="1.5" stroke-linecap="round"/>
+    <text x="64" y="199" fill="#EDF0FF" font-size="10" font-weight="700">日常学习记录</text>
+    <text x="64" y="212" fill="#868DBA" font-size="9">正在获取…</text>
+    <path d="M34 256H134" stroke="#262D55" stroke-width="3" stroke-linecap="round"/>
+    <path d="M34 256H108" stroke="url(#heroRule)" stroke-width="3" stroke-linecap="round"/>
+    <text x="34" y="278" fill="#868DBA" font-size="9">流式任务进度</text>
+    <text x="143" y="278" fill="#9D88FF" font-size="10" font-weight="700">75%</text>
+
+    <rect x="210" y="66" width="428" height="232" rx="8" fill="#151B33" stroke="#262D55"/>
+    <text x="230" y="91" fill="#EDF0FF" font-size="13" font-weight="700">字幕编辑器</text>
+    <text x="230" y="110" fill="#868DBA" font-family="Cascadia Code, Consolas, monospace" font-size="10">BV1xx411c7mD · P1</text>
+    <rect x="230" y="126" width="72" height="24" rx="6" fill="#7C5CFF"/>
+    <text x="248" y="142" fill="#0B0E1E" font-size="10" font-weight="700">简体中文</text>
+    <rect x="310" y="126" width="62" height="24" rx="6" fill="#212A52"/>
+    <text x="326" y="142" fill="#868DBA" font-size="10">English</text>
+    <rect x="230" y="166" width="386" height="82" rx="6" fill="#171D3B"/>
+    <text x="248" y="190" fill="#C2C8EC" font-family="Cascadia Code, SFMono-Regular, Consolas, monospace" font-size="12">今天我们来聊聊一个</text>
+    <text x="248" y="214" fill="#C2C8EC" font-family="Cascadia Code, SFMono-Regular, Consolas, monospace" font-size="12">很有意思的话题。</text>
+    <text x="248" y="238" fill="#868DBA" font-family="Cascadia Code, SFMono-Regular, Consolas, monospace" font-size="12">字幕会在这里逐条出现。</text>
+    <rect x="230" y="264" width="90" height="22" rx="6" fill="#3A1430"/>
+    <text x="249" y="279" fill="#FF5C8A" font-size="10" font-weight="700">TXT 导出</text>
+    <rect x="328" y="264" width="90" height="22" rx="6" fill="#7C5CFF"/>
+    <text x="362" y="279" fill="#0B0E1E" font-size="10" font-weight="700">复制</text>
   </g>
-
-  <g filter="url(#shadow)">
-    <rect x="570" y="54" width="548" height="493" rx="22" fill="#F7FBFF"/>
-    <rect x="570.5" y="54.5" width="547" height="492" rx="21.5" stroke="#B9D6EE"/>
-    <rect x="570" y="54" width="548" height="54" rx="22" fill="#FFFFFF"/>
-    <circle cx="601" cy="81" r="6" fill="#FF6EAC"/>
-    <circle cx="622" cy="81" r="6" fill="#FFC969"/>
-    <circle cx="643" cy="81" r="6" fill="#57D5A0"/>
-    <text x="676" y="86" fill="#294560" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="650">字幕工作台</text>
-    <rect x="930" y="70" width="154" height="22" rx="11" fill="#E8F6FF"/>
-    <circle cx="945" cy="81" r="4" fill="#1BA9E8"/>
-    <text x="957" y="85" fill="#2D7AA3" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="10">B 站已连接</text>
-
-    <rect x="594" y="132" width="152" height="385" rx="15" fill="#EEF7FD"/>
-    <text x="613" y="160" fill="#294560" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="12" font-weight="700">字幕任务</text>
-    <text x="613" y="181" fill="#7792A9" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="10">成功 3 / 4</text>
-    <rect x="613" y="203" width="114" height="58" rx="10" fill="#DDF3FF" stroke="#64C8F3"/>
-    <circle cx="631" cy="223" r="7" fill="#22B67B"/>
-    <path d="M627.5 223L630 225.5L635 220.5" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-    <text x="646" y="224" fill="#2D4B66" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="10" font-weight="650">BV1xx411c7mD</text>
-    <text x="646" y="241" fill="#7590A8" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="9">3 种语言 · 已完成</text>
-    <rect x="613" y="272" width="114" height="58" rx="10" fill="#FFFFFF"/>
-    <circle cx="631" cy="292" r="7" fill="#FFB95E"/>
-    <path d="M631 288V296M627 292H635" stroke="white" stroke-width="1.4" stroke-linecap="round"/>
-    <text x="646" y="293" fill="#2D4B66" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="10" font-weight="650">日常学习记录</text>
-    <text x="646" y="310" fill="#7590A8" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="9">正在获取…</text>
-    <rect x="613" y="341" width="114" height="58" rx="10" fill="#FFFFFF"/>
-    <circle cx="631" cy="361" r="7" fill="#22B67B"/>
-    <path d="M627.5 361L630 363.5L635 358.5" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-    <text x="646" y="362" fill="#2D4B66" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="10" font-weight="650">产品发布会</text>
-    <text x="646" y="379" fill="#7590A8" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="9">2 种语言 · 已完成</text>
-    <rect x="613" y="420" width="114" height="3" rx="1.5" fill="#D0E0EC"/>
-    <rect x="613" y="420" width="82" height="3" rx="1.5" fill="url(#line)"/>
-    <text x="613" y="450" fill="#7792A9" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="9">批量任务进度</text>
-    <text x="698" y="450" fill="#2D7AA3" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="9" font-weight="700">75%</text>
-
-    <rect x="770" y="132" width="324" height="385" rx="15" fill="#FFFFFF" stroke="#DCEBF5"/>
-    <text x="793" y="160" fill="#294560" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="12" font-weight="700">字幕编辑器</text>
-    <text x="793" y="181" fill="#7792A9" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="10">BV1xx411c7mD · P1</text>
-    <rect x="793" y="200" width="62" height="24" rx="12" fill="#E7F7FF"/>
-    <text x="808" y="216" fill="#168CC5" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="10" font-weight="700">简体中文</text>
-    <rect x="863" y="200" width="48" height="24" rx="12" fill="#F2F6FA"/>
-    <text x="879" y="216" fill="#7792A9" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="10">English</text>
-    <rect x="793" y="246" width="278" height="184" rx="11" fill="#F8FBFD"/>
-    <text x="812" y="273" fill="#4A667E" font-family="ui-monospace,Consolas,monospace" font-size="11">今天我们来聊聊一个</text>
-    <text x="812" y="298" fill="#4A667E" font-family="ui-monospace,Consolas,monospace" font-size="11">很有意思的话题。</text>
-    <text x="812" y="342" fill="#4A667E" font-family="ui-monospace,Consolas,monospace" font-size="11">字幕会在这里逐条出现，</text>
-    <text x="812" y="367" fill="#4A667E" font-family="ui-monospace,Consolas,monospace" font-size="11">你可以马上校对和润色。</text>
-    <rect x="812" y="392" width="110" height="4" rx="2" fill="#D9E8F1"/>
-    <rect x="812" y="408" width="169" height="4" rx="2" fill="#D9E8F1"/>
-    <rect x="793" y="454" width="112" height="30" rx="9" fill="#EEF7FD"/>
-    <text x="815" y="473" fill="#2D7AA3" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="10" font-weight="650">TXT 导出</text>
-    <rect x="916" y="454" width="74" height="30" rx="9" fill="#1BA9E8"/>
-    <text x="938" y="473" fill="white" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="10" font-weight="650">复制</text>
-  </g>
-
-  <path d="M80 535H500" stroke="url(#line)" stroke-opacity="0.7"/>
-  <text x="80" y="570" fill="#8AA7C1" font-family="Inter,Segoe UI,Microsoft YaHei,sans-serif" font-size="11" letter-spacing="1.6">SCAN  →  RESOLVE  →  EDIT  →  EXPORT</text>
 </svg>

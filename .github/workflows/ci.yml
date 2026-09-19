@@ -10,10 +10,11 @@ permissions:
   contents: read
 
 jobs:
+  # 分支保护同时要求 `CI` 与 `verify` 两个检查上下文，
+  # 因此保留双 job 结构：verify 跑真实检查，required-status 只做汇总门禁。
   verify:
     name: CI
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,7 +22,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 11.1.0
+          version: 11.25.0
           run_install: false
 
       - name: Setup Node
@@ -34,11 +35,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
+      - name: Typecheck frontend
         run: pnpm typecheck
 
-      - name: Build
+      - name: Build frontend
         run: pnpm build
+
+      - name: Typecheck API
+        run: pnpm typecheck:api
+
+      - name: Build API
+        run: pnpm build:api
 
   required-status:
     name: verify

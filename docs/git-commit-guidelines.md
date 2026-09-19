@@ -1,8 +1,8 @@
-# Git 提交与版本发布规范
+### Git 提交与版本发布规范
 
 本项目采用 [约定式提交 1.0.0](https://www.conventionalcommits.org/zh-hans/v1.0.0/) 管理提交信息，并通过 Release Please 自动生成版本 PR、CHANGELOG、GitHub Release 和版本标签。
 
-## 提交格式
+### 提交格式
 
 ```text
 <type>[optional scope]: <description>
@@ -22,7 +22,7 @@ ci: verify next app build
 feat!: remove python cli
 ```
 
-## type 取值
+### type 取值
 
 - `feat`: 新功能或新增用户可感知能力。
 - `fix`: 修复 bug 或异常行为。
@@ -36,14 +36,14 @@ feat!: remove python cli
 - `style`: 只改格式，不改语义。
 - `revert`: 回滚历史提交。
 
-## 提交粒度
+### 提交粒度
 
 - 不同功能分开提交，业务能力、CI、文档不要混在同一个提交里。
 - 每个提交只表达一个清晰意图，描述使用英文小写开头，末尾不加句号。
 - 不提交本地登录态、依赖目录、构建缓存和临时验证文件。
 - 涉及行为变化时，提交前至少运行类型检查和构建。
 
-## 版本号规范
+### 版本号规范
 
 本项目使用 SemVer：`MAJOR.MINOR.PATCH`。
 
@@ -52,7 +52,7 @@ feat!: remove python cli
 - `!` 或 `BREAKING CHANGE:` 对应 `MAJOR`。
 - `docs`、`test`、`refactor`、`ci`、`build`、`chore` 默认不触发版本号提升，除非带有破坏性变更标记。
 
-## 发布规则
+### 发布规则
 
 - 不因单个普通功能提交立即手动打 tag。
 - 多个 PR 积累到一个稳定发布点后，合并 Release Please 创建的发布 PR。
@@ -60,11 +60,11 @@ feat!: remove python cli
 - 每次发布会同步维护移动 tag：`vX` 和 `vX.Y`。
 - 是否发布由维护者在合并 Release Please PR 时决定，而不是每次功能提交自动决定。
 
-## 推荐验证
+### 推荐验证
 
 提交前运行：
 
-```powershell
+```bash
 pnpm typecheck
 pnpm build
 git diff --check

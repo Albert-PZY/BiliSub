@@ -1,0 +1,94 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check frontend types
+        run: pnpm typecheck
+
+      - name: Resolve and validate Pages settings
+        env:
+          BILI_SUB_API_BASE_URL: ${{ vars.BILI_SUB_API_BASE_URL }}
+          BILI_SUB_BASE_PATH: ${{ vars.BILI_SUB_BASE_PATH }}
+        run: |
+          if [ -z "$BILI_SUB_API_BASE_URL" ]; then
+            echo "::error::Set the BILI_SUB_API_BASE_URL repository variable before deploying Pages."
+            exit 1
+          fi
+          case "$BILI_SUB_API_BASE_URL" in
+            https://*) ;;
+            *)
+              echo "::error::BILI_SUB_API_BASE_URL must be an HTTPS URL."
+              exit 1
+              ;;
+          esac
+          api_base="${BILI_SUB_API_BASE_URL%/}"
+          base_path="${BILI_SUB_BASE_PATH:-/${GITHUB_REPOSITORY#*/}/}"
+          case "$base_path" in
+            /*/) ;;
+            *)
+              echo "::error::BILI_SUB_BASE_PATH must start and end with '/'."
+              exit 1
+              ;;
+          esac
+          {
+            echo "VITE_API_BASE_URL=$api_base"
+            echo "VITE_BASE_PATH=$base_path"
+          } >> "$GITHUB_ENV"
+
+      - name: Build static frontend
+        run: pnpm build
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
