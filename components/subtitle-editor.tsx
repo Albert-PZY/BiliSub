@@ -1,3 +1,5 @@
+'use client'
+
 import { useEffect, useRef, useState } from "react"
 import { Check, Copy, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"

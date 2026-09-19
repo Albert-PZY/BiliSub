@@ -1,3 +1,5 @@
+'use client'
+
 import { useCallback, useEffect, useRef, useState } from "react"
 import { CheckCircle2, LogOut, QrCode, RefreshCw, ShieldCheck, User } from "lucide-react"
 import { Button } from "@/components/ui/button"

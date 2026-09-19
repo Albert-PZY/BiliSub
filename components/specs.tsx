@@ -1,7 +1,8 @@
+'use client'
+
 import type { ReactNode } from "react"
 import { CheckCircle2, Github, LockKeyhole, MonitorUp, ShieldCheck, Workflow } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { assetUrl } from "@/lib/assets"
 import { MAX_SUBTITLE_PAGES, MAX_VIDEO_SOURCES } from "@/lib/limits"
 
 const GITHUB_REPOSITORY_URL = "https://github.com/Albert-PZY/BiliSub"
@@ -24,15 +25,15 @@ export function SpecsPage() {
     <div className="app-shell specs-shell">
       <header className="app-header">
         <div className="header-inner">
-          <a className="brand" href="#/" aria-label="返回字幕工作台">
-            <img className="brand-mark" src={assetUrl("icon.svg")} width="34" height="34" alt="" />
+          <a className="brand" href="/" aria-label="返回字幕工作台">
+            <img className="brand-mark" src="/icon.svg" width="34" height="34" alt="" />
             <span className="brand-copy">
               <span className="brand-name">BiliAISub</span>
               <span className="brand-caption">Workspace contract</span>
             </span>
           </a>
           <div className="header-actions">
-            <a className="header-link" href="#/">返回工作台</a>
+            <a className="header-link" href="/">返回工作台</a>
             <a className="icon-button" href={GITHUB_REPOSITORY_URL} target="_blank" rel="noreferrer" aria-label="打开 GitHub 仓库" title="GitHub 仓库">
               <Github size={17} aria-hidden="true" />
             </a>
@@ -78,18 +79,18 @@ export function SpecsPage() {
         <section className="specs-section" aria-labelledby="boundary-title">
           <div className="specs-section-head">
             <span className="section-index">03</span>
-            <div><h2 id="boundary-title" className="section-title">部署边界</h2><p className="section-note">静态页面与 Node.js API 分开发布。</p></div>
+            <div><h2 id="boundary-title" className="section-title">部署边界</h2><p className="section-note">页面与 API 同源，由同一个 Next.js 部署提供。</p></div>
           </div>
           <div className="deployment-grid">
-            <SpecCard label="GitHub Pages" value="静态前端" detail="Vite 输出 dist/；通过 VITE_API_BASE_URL 访问 API。" icon={<MonitorUp size={16} aria-hidden="true" />} />
-            <SpecCard label="Vercel / Node.js" value="独立 API" detail="Next.js Route Handlers 负责扫码、会话、解析和 NDJSON 字幕流。" icon={<LockKeyhole size={16} aria-hidden="true" />} />
-            <SpecCard label="会话保护" value="加密令牌" detail="B 站 Cookie 仅在服务端解密；跨域前端使用短期 Bearer 会话令牌。" icon={<ShieldCheck size={16} aria-hidden="true" />} />
+            <SpecCard label="Vercel / Next.js" value="单一部署" detail="页面与 /api/* 由同一次构建提供，不存在独立 API 地址。" icon={<MonitorUp size={16} aria-hidden="true" />} />
+            <SpecCard label="Route Handlers" value="同源 API" detail="app/api/* 负责扫码、会话、视频解析和 NDJSON 字幕流。" icon={<LockKeyhole size={16} aria-hidden="true" />} />
+            <SpecCard label="会话保护" value="加密 Cookie" detail="B 站 Cookie 仅在服务端解密，页面只拿到账号摘要。" icon={<ShieldCheck size={16} aria-hidden="true" />} />
           </div>
         </section>
       </main>
 
       <footer className="footer">
-        <div className="footer-inner"><span>BiliAISub · 当前实现规格</span><a className="footer-link" href="#/">返回工作台</a></div>
+        <div className="footer-inner"><span>BiliAISub · 当前实现规格</span><a className="footer-link" href="/">返回工作台</a></div>
       </footer>
     </div>
   )

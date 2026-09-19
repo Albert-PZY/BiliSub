@@ -1,3 +1,11 @@
+'use client'
+
+/*
+ * BiliAISub 工作台。应用是一个单一 Next.js 部署：
+ * 前端页面与 /api 路由同源，因此不需要 API 域名、静态 base path
+ * 或跨域会话令牌。工作区规格页由 app/specs/page.tsx 提供。
+ */
+
 import { useCallback, useState, type KeyboardEvent, type ReactNode } from "react"
 import { Download, FilePenLine, Info, Loader2, Github, Sparkles } from "lucide-react"
 import { DownloadPanel } from "@/components/download-panel"
@@ -8,7 +16,6 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { VideoInput } from "@/components/video-input"
 import { VideoPageSelector } from "@/components/video-page-selector"
 import { useSubtitleWorkspace } from "@/hooks/use-subtitle-workspace"
-import { assetUrl } from "@/lib/assets"
 import { MAX_SUBTITLE_PAGES, MAX_VIDEO_SOURCES } from "@/lib/limits"
 import type { Account } from "@/lib/local-api"
 
@@ -97,7 +104,7 @@ export default function Home() {
       <header className="app-header">
         <div className="header-inner">
           <a className="brand" href="#top" aria-label="返回页面顶部">
-            <img className="brand-mark" src={assetUrl("icon.svg")} width="34" height="34" alt="" />
+            <img className="brand-mark" src="/icon.svg" width="34" height="34" alt="" />
             <span className="brand-copy">
               <span className="brand-name">BiliAISub</span>
               <span className="brand-caption">Subtitle workspace</span>
@@ -106,7 +113,7 @@ export default function Home() {
 
           <div className="header-actions">
             <AuthStatusChip status={auth.status} account={auth.account} />
-            <a className="header-link" href="#/specs">规格</a>
+            <a className="header-link" href="/specs">规格</a>
             <a
               className="icon-button"
               href={GITHUB_REPOSITORY_URL}
@@ -247,7 +254,7 @@ export default function Home() {
         <div className="footer-inner">
           <span>BiliAISub · 字幕内容来自 B 站官方 AI 字幕</span>
           <nav className="footer-nav" aria-label="项目链接">
-            <a className="footer-link" href="#/specs">规格</a>
+            <a className="footer-link" href="/specs">规格</a>
             <a className="footer-link" href={GITHUB_REPOSITORY_URL} target="_blank" rel="noreferrer">查看源代码</a>
           </nav>
         </div>

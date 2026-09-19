@@ -4,6 +4,21 @@
    Token 分三层：原始色板见注释、语义层在这里、组件规则只消费语义层。
    ========================================================================= */
 
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--ink);
+  --color-border: var(--line);
+  --color-primary: var(--brand);
+  --color-primary-foreground: var(--on-brand);
+  --color-muted: var(--surface-subtle);
+  --color-muted-foreground: var(--muted);
+}
+
 :root {
   color-scheme: light;
 
@@ -67,7 +82,8 @@
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-:root[data-theme="dark"] {
+:root[data-theme="dark"],
+:root.dark {
   color-scheme: dark;
 
   --bg: #080b18;
@@ -108,7 +124,6 @@
   --glow-brand: 0 0 0 1px rgba(124, 92, 255, 0.5), 0 12px 40px rgba(124, 92, 255, 0.3);
   --grid-line: rgba(237, 240, 255, 0.045);
 }
-
 * {
   box-sizing: border-box;
 }
