@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.0.0](https://github.com/Albert-PZY/BiliSub/compare/v1.1.0...v2.0.0) (2026-09-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* 根目录不再承载 Next.js 应用，改为 Vite + React 静态前端并构建到 dist/；服务端路由、B 站客户端与加密会话全部迁入 backend/，需作为独立 Next.js 项目部署。
+
+### Features
+
+* redesign subtitle workspace and harden workflow ([28a3536](https://github.com/Albert-PZY/BiliSub/commit/28a3536b94bad6e519c6017f406734249bd47f18))
+* split static Vite frontend and standalone Next.js API ([19447bb](https://github.com/Albert-PZY/BiliSub/commit/19447bb3c31cdea0d49a3a87c8e6bd038ce77804))
+* **ui:** redesign subtitle workspace ([2430c18](https://github.com/Albert-PZY/BiliSub/commit/2430c186c5c0d46559f6bbb5b5f37da67e63b460))
+* 修正字幕获取工作流并优化前端反馈与滚动条 ([#13](https://github.com/Albert-PZY/BiliSub/issues/13)) ([9e322da](https://github.com/Albert-PZY/BiliSub/commit/9e322da1199545dda8ccabed8e378c701c0e347f))
+
+
+### Reverts
+
+* 合并回单一 Next.js 应用（保留 Midnight Violet 视觉系统） ([fa5fdf6](https://github.com/Albert-PZY/BiliSub/commit/fa5fdf6e1f0c8e179e5d9296877c2881b2572904))
+* 合并回单一 Next.js 应用并保留 Midnight Violet 视觉系统 ([10acf45](https://github.com/Albert-PZY/BiliSub/commit/10acf4585a1687e8d54d9be8fd8c663b443f05e3))
+
 ## [1.1.0](https://github.com/Albert-PZY/BiliSub/compare/v1.0.1...v1.1.0) (2026-06-07)
 
 
