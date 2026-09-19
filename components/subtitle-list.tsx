@@ -1,3 +1,5 @@
+'use client'
+
 import { AlertTriangle, CheckCircle2, FileText, Loader2, XCircle } from "lucide-react"
 import type { SubtitleItem } from "@/lib/subtitles"
 

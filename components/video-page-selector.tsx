@@ -1,3 +1,5 @@
+'use client'
+
 import { useMemo, useState } from "react"
 import { CheckSquare, CircleAlert, ListChecks, Search, Square } from "lucide-react"
 import { Button } from "@/components/ui/button"

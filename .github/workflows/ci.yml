@@ -35,17 +35,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck frontend
+      - name: Typecheck
         run: pnpm typecheck
 
-      - name: Build frontend
+      - name: Build
         run: pnpm build
-
-      - name: Typecheck API
-        run: pnpm typecheck:api
-
-      - name: Build API
-        run: pnpm build:api
 
   required-status:
     name: verify

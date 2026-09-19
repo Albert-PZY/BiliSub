@@ -86,11 +86,11 @@ export function buildVideoPageId(page: Pick<ResolvedVideoPageResult, "bvid" | "c
   return `${page.bvid}:${page.cid}`
 }
 
+/**
+ * 前后端同源部署：前端与 API 都在同一个 Next.js 应用里，
+ * 因此始终使用相对路径 \`/api/*\`，不需要额外的 API 域名配置。
+ */
 export function getApiBaseUrl(): string {
-  const configured = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, "")
-  if (configured) return configured
-  // 留空时，本地开发使用 Vite 的 /api 代理，其他同源部署直接请求当前来源。
-  // 静态生产站点必须在构建时提供 VITE_API_BASE_URL。
   return ""
 }
 

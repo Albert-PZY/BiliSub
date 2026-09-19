@@ -1,3 +1,5 @@
+'use client'
+
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Braces, CheckCircle2, Download, FileText, Loader2, TimerReset } from "lucide-react"
 import { useToast } from "@/components/ui/toast"

@@ -1,6 +1,6 @@
 @startuml
 !pragma layout smetana
-title BiliAISub · 静态前端与独立 API 架构
+title BiliAISub · 单一 Next.js 应用架构
 left to right direction
 
 skinparam backgroundColor #0B0E1E
@@ -53,28 +53,25 @@ skinparam cloud {
 
 actor "使用者" as User
 
-node "GitHub Pages / 静态托管" as StaticHost {
-  artifact "Vite 构建产物\ndist/" as Dist
-}
+node "Vercel · 单一 Next.js 应用\nRoot Directory: 仓库根目录" as AppHost {
+  node "前端页面 · React 19" as Browser {
+    component "工作台页面\napp/page.tsx" as Page
+    component "根布局与 Provider\napp/layout.tsx" as Layout
+    component "工作区状态\nhooks/use-subtitle-workspace.ts" as Workspace
+    component "交互组件\ncomponents/*" as Components
+    component "API 客户端\nlib/local-api.ts" as LocalApi
+    component "字幕模型\nlib/subtitles.ts" as Model
+    component "浏览器导出\nTXT / SRT / JSON" as Export
+  }
 
-node "用户浏览器 · React 19" as Browser {
-  component "页面入口\nsrc/page.tsx" as Page
-  component "规格视图\nsrc/specs.tsx" as Specs
-  component "工作区状态\nsrc/hooks/use-subtitle-workspace.ts" as Workspace
-  component "交互组件\nsrc/components/*" as Components
-  component "API 客户端\nsrc/lib/local-api.ts" as LocalApi
-  component "字幕模型\nsrc/lib/subtitles.ts" as Model
-  component "浏览器导出\nTXT / SRT / JSON" as Export
-}
-
-node "Vercel · 独立 Next.js API\nRoot Directory: backend" as ApiHost {
-  component "认证接口\nbackend/app/api/auth/*" as AuthApi
-  component "视频解析接口\nbackend/app/api/videos/resolve" as ResolveApi
-  component "字幕流接口\nbackend/app/api/subtitles" as SubtitleApi
-  component "CORS 与输入限制\nbackend/lib/cors.ts\nbackend/lib/server/request.ts" as Guard
-  component "B 站服务封装\nbackend/lib/server/bilibili.ts" as BiliClient
+  component "认证接口\napp/api/auth/*" as AuthApi
+  component "视频解析接口\napp/api/videos/resolve" as ResolveApi
+  component "字幕流接口\napp/api/subtitles" as SubtitleApi
+  component "输入限制与 CORS\nlib/cors.ts\nlib/server/request.ts" as Guard
+  component "B 站服务封装\nlib/server/bilibili.ts" as BiliClient
+  component "样式与设计系统\napp/globals.css" as Style
   database "AES-256-GCM 会话\nbili_ai_sub_session" as Session
-  artifact "Vercel 配置\nbackend/vercel.json" as VercelConfig
+  artifact "Vercel 配置\nvercel.json" as VercelConfig
 }
 
 cloud "Bilibili API" as Bilibili {
@@ -83,15 +80,13 @@ cloud "Bilibili API" as Bilibili {
   component "官方 AI 字幕" as BiliSubtitle
 }
 
-User --> Browser : 操作
-StaticHost --> Browser : HTTPS 提供 dist/
-Dist ..> StaticHost : 发布边界
-
-Page --> Specs : Hash 路由
+User --> Browser : HTTPS 访问
+Layout --> Page : 渲染
+Layout --> Style : 载入
 Page --> Components : 组合界面
 Page --> Workspace : 触发任务
 Workspace --> Model : 读取 / 更新字幕
-Workspace --> LocalApi : JSON / NDJSON
+Workspace --> LocalApi : 同源 JSON / NDJSON
 Components --> Export : 触发下载
 
 LocalApi --> AuthApi : 登录 / 状态
@@ -110,14 +105,16 @@ BiliClient --> BiliVideo : HTTPS
 BiliClient --> BiliSubtitle : HTTPS
 
 note bottom of Session
-同源：HttpOnly Cookie。
-跨域 Pages：白名单来源收到加密 token，
-由 sessionStorage 以 Bearer 发送。
-B 站 Cookie 只在服务端解密使用。
+页面与 /api/* 同源，
+会话只写入 HttpOnly Cookie。
+若前端被单独部署到白名单里的其他 origin，
+额外下发加密 token 供 Bearer 使用；
+B 站 Cookie 只在服务端解密。
 end note
 
-note bottom of ApiHost
-API 独立部署，Vercel Root Directory 为 backend。
+note bottom of AppHost
+页面与 API 由同一次部署提供，
+不存在独立 API 地址或 VITE_ 环境变量。
 end note
 
 @enduml
